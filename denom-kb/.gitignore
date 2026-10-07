@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+config.yaml
+run_overnight.out
+# per-group work and caches stay local; the outputs are shared
+work/*
+!work/out/
+work_dryrun/

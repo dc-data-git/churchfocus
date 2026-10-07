@@ -1,0 +1,43 @@
+# Copy to config.yaml and edit. Paths are relative to this file.
+
+workbook: ../US_Religious_Groups_217_All_Six_Layers.xlsx   # read-only input; never modified
+fields: data/fields.yaml          # which fields to fill, search keywords, Christian-only flags
+overrides: data/overrides.yaml    # per-group fixes: wikipedia title, website, extra urls, skip
+work_dir: work                    # per-group results, caches, outputs (work/out/)
+export_every: 5                   # re-export outputs every N groups
+
+llm:
+  provider: ollama                # ollama | openai_compat (llama.cpp, LM Studio, vLLM)
+  base_url: http://localhost:11434
+  api_key_env: ""
+  chat_model: qwen2.5:7b          # 8 GB VRAM: qwen2.5:7b or llama3.1:8b at Q4 (~5-6 GB with 8k context)
+  temperature: 0
+  num_ctx: 8192                   # prompts are ~3-4k tokens; 8k leaves room for repairs
+  timeout_s: 300
+  max_retries: 3
+  json_repair_attempts: 2         # model gets its own errors back (bad quote, missing field) and retries
+
+web:
+  # Wikipedia asks bots to identify themselves with a contact. Put an email or project URL here.
+  user_agent: "denom-kb/0.1 (church discovery hackathon research; contact: CHANGE-ME)"
+  per_domain_delay_s: 1.5         # politeness delay between requests to the same site
+  timeout_s: 20
+
+crawl:
+  enabled: true
+  max_pages: 15                   # official-site pages per group (beliefs, history, governance, ...)
+  max_depth: 2
+
+extract:
+  fields_per_call: 5              # fields filled per model call
+  excerpts_per_field: 3           # BM25 excerpts retrieved per field
+  max_excerpts: 8                 # excerpts per call (keeps prompts ~3-4k tokens)
+  chunk_words: 220
+
+validate:
+  enabled: true                   # check existing (non-Unknown) values against sources
+
+groups:
+  max: null                       # null = all 217, largest first. Try 3 first.
+  only: []                        # e.g. [sbc, umc]
+  skip: []

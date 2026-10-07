@@ -1,0 +1,14 @@
+# Per-group corrections, keyed by Database ID (column B of the workbook).
+#   wikipedia: exact article title to use (skips search + model match check)
+#   website: official site to crawl
+#   extra_urls: more pages to read (statement of faith PDFs, polity documents, ...)
+#   skip: true   to leave a group alone
+#
+# Examples (uncomment / edit after checking work/out/report.md):
+# usrc2020_ffr:
+#   skip: true
+# usrc2020_031:
+#   wikipedia: Amish
+# nbcusa:
+#   wikipedia: National Baptist Convention, USA, Inc.
+{}
