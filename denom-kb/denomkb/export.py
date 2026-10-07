@@ -105,7 +105,8 @@ def run(cfg: dict, root: Path, kb: KB, dry_run: bool) -> dict:
                      "evidence": []}
             for p in by_gf.get((g["id"], fid), []):
                 e = {"action": p["action"], "quote": p["quote"], "url": p["url"], "source_type": p["source_type"],
-                     "confidence": p["confidence"], "model": p["model"], "checked_at": p["checked_at"]}
+                     "confidence": p["confidence"], "model": p["model"], "checked_at": p["checked_at"],
+                     "human_decision": p.get("human_decision", "")}
                 if p["action"] == "fill":
                     entry["value"], entry["status"] = p["new_value"], "model_extracted_needs_review"
                 elif p["action"] == "not_applicable":

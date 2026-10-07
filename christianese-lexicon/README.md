@@ -15,7 +15,26 @@ plus a report with the numbers for the hackathon build doc.
 
 ---
 
-## Quick start (WSL2 / Ubuntu / macOS)
+## Quick start: Windows (PowerShell)
+
+Needs Python 3.12 or 3.13 from python.org (every dependency has a prebuilt wheel) and Ollama for Windows.
+
+```powershell
+git pull
+cd church-discorvery-hackathon\christianese-lexicon
+ollama pull qwen2.5:14b; ollama pull qwen2.5:7b; ollama pull nomic-embed-text
+py -3 -m venv .venv
+.venv\Scripts\Activate.ps1                   # if blocked: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+pip install -r requirements.txt
+copy config.example.yaml config.yaml
+#   put corpus files in data\raw\
+$env:PYTHONUTF8 = "1"
+python -m lexicon doctor
+powershell -ExecutionPolicy Bypass -File scripts\run_overnight.ps1
+python -m lexicon status
+```
+
+## Quick start: Linux / WSL2 / macOS
 
 This folder lives inside the hackathon repo (`church-discorvery-hackathon/christianese-lexicon/`)
 but is self-contained: run every command from this folder.

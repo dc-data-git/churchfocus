@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+jinja2
+python-multipart
+httpx
+pydantic>=2
+python-dotenv
+PyYAML
+rapidfuzz
+feedparser
+trafilatura
+pypdf
+mcp
+openai
+imageio-ffmpeg
+pytest

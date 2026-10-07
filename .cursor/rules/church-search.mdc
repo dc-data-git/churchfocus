@@ -1,0 +1,11 @@
+---
+description: Church Search project rules (always on)
+alwaysApply: true
+---
+Before writing code in this repo:
+1. Follow docs/CONVENTIONS.md (rules + definition of done).
+2. Use only names from docs/INTERFACES.md and feature ids from contracts/features.yaml.
+3. Do only the task you were given from docs/BUILD_PLAN.md and touch only its listed files.
+4. Guardrails in docs/PRD.md section 5 are non-negotiable.
+5. Already built and tested (do not regenerate): app/config.py, app/models.py, app/features.py, app/match.py, app/denom/*, tests/conftest.py, tests/test_kb.py, tests/test_match.py, tests/test_features.py, tests/fixtures/kb_small.json.
+6. Run `python -m pytest -q` before saying a task is done. If blocked, reply "blocked: <reason>".

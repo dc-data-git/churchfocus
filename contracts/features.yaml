@@ -1,0 +1,192 @@
+# Church Search: shared feature vocabulary (features.v2)
+#
+# THE CONTRACT. One list of features that every part of the app reads and writes:
+#   Stage 0 conversation      -> preference profile  {feature: {want: [values], weight}}
+#   denomination tool (MCP)   -> prior for a church   (via denom_field -> denom-kb field)
+#   Stages 1-3 research agent -> church evidence       {feature: {value, tier, quote, url, how}}
+#   matcher                   -> deterministic score from profile x evidence
+#   christianese-lexicon      -> maps jargon onto these ids
+#
+# Merged from: Katie's theology list ("Theo list" + "Fact list" in HACKATHON SEARCH.docx),
+# the denomination workbook (denom-kb/data/fields.yaml), and christianese-lexicon/data/features.yaml (v1).
+# Change process: add/rename here first, bump version, note it in DECISIONS.md.
+#
+# Keys per feature
+#   label     short display name
+#   values    allowed values. "unstated" and "unknown" are always also allowed:
+#               unstated = we looked; the church does not say      unknown = not looked / not found
+#   ask       Stage 0: core = always asked | standard = asked by default, skippable |
+#             if_raised = only if the user brings it up | advanced = only if user opts into theology detail |
+#             never = never asked (display only)
+#   question  scenario wording for Stage 0 (observable, everyday language; no jargon)
+#   stage     earliest stage that can usually fill it (1 light, 2 medium, 3 deep)
+#   sources   where evidence usually comes from (see source_kinds)
+#   denom_field  denom-kb field that gives a denominational prior (a prior is never a church fact)
+#   sensitive true -> denominational prior used only if original workbook value or human-accepted; church value needs
+#             tier A with quote, or D observed from the church's own sermons/staff pages (>= 5 data points)
+#   observed  true -> can be checked against behaviour (revealed), not only statements (D6)
+
+version: features.v3
+
+# ---------------------------------------------------------------- evidence rules
+tiers:
+  A: "Published by the church itself (website, statement of faith, bulletin, its own sermons/feeds). Not overwritten by lower tiers; conflicts are shown, not resolved silently."
+  B: "Independent outside source about this church (denomination directory or statistics, news outlet, Google Places, Wayback copy of the church's own site counts as A for its date)."
+  C: "Weaker third-party signals (reviews, setlist aggregators, social posts by the church's public accounts, network listings)."
+  D: "Inference by the model from patterns (e.g. who preached in 40 sermons). Always labelled 'inferred' with the evidence it used."
+  prior: "Denominational default from the denomination knowledge base. Shown as 'typical for <denomination>', never as a fact about this church."
+
+settled_rule: "A feature is settled for a church when it has one tier-A quote, or two independent tier-B sources, or (for observed features) a D inference over >= 5 data points. Otherwise it stays open."
+
+weights: [dealbreaker, important, nice_to_have, dont_care]
+
+rules:
+  marriage_rule: >
+    When a church (or denomination) defines marriage, that IS its stated position on same-sex marriage,
+    even if LGBTQ people are not mentioned: "marriage is between one man and one woman" -> lgbtq.marriage = traditional (tier of the source, quote attached).
+    The rule stops there: a marriage statement says nothing about membership, serving or leadership (lgbtq.inclusion stays unstated).
+  stated_only: "Positions on social and political questions are recorded only when the church states them publicly (tier A) or a cited news outlet reports a public action (tier B). Never inferred from denomination, demographics or location."
+  no_people_data: "Never collect or infer data about congregants, donors, minors or staff pay. Named people are limited to publicly listed leaders and their published teaching."
+
+source_kinds: [places_api, osm, overture, website, statement_of_faith, staff_page, calendar, church_center,
+               denomination_locator, denomination_stats, network_directory, sermon_feed, sermon_transcript,
+               livestream, wayback, news, reviews, setlists, leader_publications]
+
+# ---------------------------------------------------------------- features
+features:
+
+  # --- practical / logistics (Light search) ---
+  logistics.distance:        {label: Distance, values: [miles], ask: core, stage: 1, sources: [places_api],
+                              question: "Where would you be coming from, and how far is too far to drive on a Sunday?"}
+  logistics.service_times:   {label: Service times, values: [schedule], ask: standard, stage: 1, sources: [places_api, website, osm],
+                              question: "Are there days or times that work best (Sunday morning, Saturday evening, Sunday night)?"}
+  logistics.service_length:  {label: Service length, values: [under_60, 60_90, over_90], ask: standard, stage: 2, sources: [livestream, website], denom_field: practice_culture.service_length, observed: true,
+                              question: "How long a service feels right: about an hour, an hour and a half, or longer is fine?"}
+  logistics.sermon_length:   {label: Sermon length, values: [under_20, 20_35, over_35], ask: standard, stage: 3, sources: [sermon_feed, livestream], observed: true,
+                              question: "When the pastor preaches, would you rather it be short (under 20 min), medium, or long and in-depth?"}
+  logistics.size:            {label: Size, values: [small, medium, large, mega], ask: standard, stage: 2, sources: [denomination_stats, website, places_api],
+                              question: "Picture walking in: do you want to know most people by name (under 100), a mid-size church, or a big church with lots of programs?"}
+  logistics.multisite:       {label: Campuses / video sermon, values: [single_site, multisite_live_preacher, multisite_video], ask: if_raised, stage: 2, sources: [website, network_directory]}
+  logistics.language:        {label: Language, values: [language_list], ask: standard, stage: 1, sources: [website, places_api],
+                              question: "Do you need services in a language other than English?"}
+  logistics.accessibility:   {label: Accessibility, values: [wheelchair, hearing_assist, sign_language, transportation], ask: standard, stage: 1, sources: [places_api, website], denom_field: practice_culture.accessibility,
+                              question: "Does anyone in your group need wheelchair access, hearing help, sign language, or a ride?"}
+  logistics.current_activity: {label: Still active, values: [active, possibly_closed, closed], ask: never, stage: 1, sources: [places_api, website, calendar]}
+
+  # --- identity / tradition ladder (Influence -> Tradition -> Denomination) ---
+  identity.branch:           {label: Branch, values: [catholic, eastern_orthodox, oriental_orthodox, mainline_protestant, evangelical_protestant, black_protestant, pentecostal_charismatic, restorationist, anabaptist, other_christian, non_christian], ask: core, stage: 1, sources: [denomination_locator, website], denom_field: identity.broad_branch,
+                              question: "Have you been part of a church before? Which kind felt like home, or felt wrong?"}
+  identity.tradition:        {label: Tradition, values: [baptist, methodist_wesleyan, holiness, presbyterian_reformed, lutheran, anglican_episcopal, pentecostal, charismatic_nondenom, anabaptist_mennonite, restoration_christian, adventist, nondenominational_evangelical, other], ask: standard, stage: 1, sources: [denomination_locator, website], denom_field: identity.primary_family,
+                              question: "Any church families you'd especially like to include or avoid (for example Baptist, Methodist, Lutheran, Catholic, Pentecostal, non-denominational)?"}
+  identity.denomination:     {label: Denomination, values: [denomination_id], ask: if_raised, stage: 1, sources: [denomination_locator, website, network_directory], denom_field: identity.canonical_name,
+                              prior_returns: "KB group id (groups[].id), not the name",
+                              note: "Value carries a confidence (0-1) and how it was found: name | locator | website | network | inferred."}
+  identity.network:          {label: Network, values: [network_name, none], ask: never, stage: 1, sources: [network_directory, website], denom_field: identity.networks_associations}
+  identity.distance_from_denomination: {label: Fit with own denomination, values: [typical, somewhat_different, very_different], ask: never, stage: 3, sources: [statement_of_faith, sermon_transcript],
+                              note: "Computed: church evidence vs denomination prior, feature by feature. Displayed, never matched on."}
+
+  # --- worship (Light basic -> Deep detail) ---
+  worship.style:             {label: Worship style, values: [liturgical_traditional, traditional_hymns, blended, contemporary, gospel, charismatic_expressive], ask: core, stage: 2, sources: [website, livestream, setlists, reviews], denom_field: practice_culture.typical_worship_style, observed: true,
+                              question: "Think of a Sunday you'd enjoy: robes and an organ, hymns with a piano, a full band with lights, a gospel choir, or something in between?"}
+  worship.music_sources:     {label: Song sources, values: [modern_worship_labels, hymns, psalms, gospel, chant, mixed], ask: advanced, stage: 3, sources: [setlists, livestream], observed: true}
+  worship.instruments:       {label: Instruments, values: [organ, piano, band, orchestra, a_cappella, none], ask: if_raised, stage: 3, sources: [livestream, website], observed: true}
+  worship.choir:             {label: Choir, values: [present, absent], ask: if_raised, stage: 3, sources: [livestream, website], denom_field: practice_culture.choir, observed: true}
+  worship.liturgy:           {label: Liturgy, values: [high, some, none], ask: standard, stage: 2, sources: [website, livestream], denom_field: practice_culture.liturgical_intensity, observed: true,
+                              question: "Do you like set prayers and readings everyone says together (like the Lord's Prayer or a creed), or a looser, spontaneous flow?"}
+  worship.expressiveness:    {label: Expressiveness, values: [high, some, low], ask: standard, stage: 3, sources: [livestream], observed: true,
+                              question: "During worship, are you comfortable with people raising hands, calling out, or dancing, or do you prefer it quiet and reverent?"}
+  worship.communion_frequency: {label: Communion frequency, values: [weekly, monthly, quarterly, occasional], ask: advanced, stage: 2, sources: [website, livestream], denom_field: theology.communion_frequency}
+  worship.altar_call:        {label: Altar call, values: [regular, occasional, absent], ask: if_raised, stage: 3, sources: [livestream, sermon_transcript], denom_field: practice_culture.altar_calls, observed: true}
+  worship.production:        {label: Production level, values: [high, some, low], ask: if_raised, stage: 3, sources: [livestream], observed: true}
+  worship.bulletin:          {label: Printed order of service, values: [present, absent], ask: never, stage: 3, sources: [website]}
+
+  # --- preaching (Deep; mostly observed) ---
+  preaching.style:           {label: Preaching style, values: [expository, topical, lectionary_homily, mixed], ask: standard, stage: 3, sources: [sermon_feed, sermon_transcript], denom_field: practice_culture.sermon_emphasis, observed: true,
+                              question: "Would you rather the pastor walk through a book of the Bible verse by verse, or preach on a life topic each week?"}
+  preaching.audience:        {label: Sermon audience, values: [believers_teaching, seekers_evangelism, mixed], ask: standard, stage: 3, sources: [sermon_transcript], observed: true,
+                              question: "Are sermons mainly for you to grow deeper, or for bringing a friend who isn't a Christian?"}
+  preaching.scripture_density: {label: Bible depth, values: [high, medium, low], ask: if_raised, stage: 3, sources: [sermon_transcript], observed: true}
+  preaching.politics_frequency: {label: Politics from the pulpit, values: [frequent, occasional, rare], ask: standard, stage: 3, sources: [sermon_transcript], observed: true,
+                              question: "How do you feel about politics or current events coming up in sermons: welcome, occasionally, or rather not?",
+                              note: "Frequency only, measured from sermons. Never a party label (D8, stated_only)."}
+  preaching.topics:          {label: Recurring topics, values: [topic_list], ask: never, stage: 3, sources: [sermon_feed, sermon_transcript], observed: true}
+
+  # --- women in ministry ladder (Katie's breakdown). Stage 0 asks ONE ladder question, maps to these. ---
+  women.senior_pastor:       {label: Woman can be lead pastor, values: [yes, no], ask: core, stage: 2, sources: [statement_of_faith, staff_page], denom_field: governance.women_senior_pastors, sensitive: true, observed: true,
+                              question: "LADDER: Churches differ on which roles women hold. Going up this list, how far would you be comfortable seeing women serve? (a) kids' and women's ministries (b) deacons (c) teaching mixed adult classes (d) preaching on a Sunday sometimes (e) associate or other pastors (f) elders (g) lead pastor. Or: no preference. FOLLOW-UP: Is that something you need to see (a minimum), as far as you're comfortable going (a maximum), or both?",
+                              note: "Mapping: rung R chosen. Roles above R: want=[no] if maximum/both, else dont_care. Roles at or below R: want=[yes] (women.preach: [regularly, occasionally]) if minimum/both, else dont_care. Weight asked separately."}
+  women.pastor_other:        {label: Woman can be associate pastor, values: [yes, no], ask: core, stage: 2, sources: [staff_page, statement_of_faith], denom_field: governance.women_ordination, sensitive: true, observed: true}
+  women.elder:               {label: Woman can be elder, values: [yes, no], ask: core, stage: 2, sources: [staff_page, statement_of_faith], denom_field: governance.women_ordination, sensitive: true, observed: true}
+  women.preach:              {label: Women preach on Sunday, values: [regularly, occasionally, never], ask: core, stage: 3, sources: [sermon_feed, statement_of_faith], denom_field: governance.women_preaching, sensitive: true, observed: true,
+                              note: "Stated policy vs observed share of sermons by women (D6). Show both when they differ."}
+  women.teach_mixed_adults:  {label: Women teach mixed adult classes, values: [yes, no], ask: core, stage: 2, sources: [website, calendar], sensitive: true, observed: true}
+  women.deacon:              {label: Woman can be deacon, values: [yes, no], ask: core, stage: 2, sources: [staff_page, statement_of_faith], sensitive: true, observed: true}
+  women.home_roles:          {label: Teaching on marriage roles, values: [egalitarian, complementarian], ask: advanced, stage: 3, sources: [statement_of_faith, sermon_transcript], sensitive: true}
+
+  # --- LGBTQ (asked as a standard question; neutral wording; 'prefer not to say' = dont_care) ---
+  lgbtq.marriage:            {label: Marriage teaching, values: [affirming, traditional], ask: standard, stage: 2, sources: [statement_of_faith, website], denom_field: practice_culture.same_sex_marriage, sensitive: true,
+                              question: "Churches differ in how they teach about marriage. Should we look for: churches that affirm same-sex marriage / churches that teach marriage as between a man and a woman / doesn't matter / prefer not to say?",
+                              note: "See rules.marriage_rule."}
+  lgbtq.inclusion:           {label: LGBTQ membership and leadership, values: [full, membership_not_leadership, welcome_not_membership], ask: standard, stage: 3, sources: [statement_of_faith, website, sermon_transcript], denom_field: practice_culture.lgbtq_relationships, sensitive: true,
+                              question: "Separately from marriage teaching, churches differ on whether LGBTQ people can become members or serve in leadership. Should we look for: full membership and leadership open / membership open, leadership not / doesn't matter / prefer not to say?",
+                              note: "Never inferred from lgbtq.marriage alone. In 'for others' mode ask only about the person's preference for the church, never about the person's orientation."}
+
+  # --- theology (seeker asks top level only; Katie's sub-questions are 'advanced') ---
+  theology.scripture:        {label: View of the Bible, values: [inerrant, infallible, inspired_authoritative, tradition_and_scripture], ask: advanced, stage: 2, sources: [statement_of_faith], denom_field: theology.scripture_inerrancy}
+  theology.baptism:          {label: Baptism, values: [believers_immersion, infant_and_adult, either], ask: standard, stage: 2, sources: [statement_of_faith, website], denom_field: theology.baptism_recipients,
+                              question: "Do you have a view on baptizing babies versus baptizing people when they choose to believe?"}
+  theology.baptism_required_to_join: {label: Rebaptism to join, values: [required, not_required], ask: if_raised, stage: 2, sources: [website, statement_of_faith], denom_field: theology.baptism_recognition}
+  theology.communion_view:   {label: Communion view, values: [real_presence_transformation, real_presence, spiritual_presence, memorial], ask: advanced, stage: 2, sources: [statement_of_faith], denom_field: theology.communion_presence}
+  theology.gifts:            {label: Spiritual gifts today, values: [continuationist_public, continuationist_private, open_but_cautious, cessationist], ask: standard, stage: 2, sources: [statement_of_faith, livestream, sermon_transcript], denom_field: theology.continuationism, observed: true,
+                              question: "Would you be comfortable in a service where people speak in tongues or pray for healing out loud, or would that feel out of place?"}
+  theology.spirit_baptism:   {label: Baptism in the Spirit, values: [required_evidence_tongues, taught_not_required, not_taught], ask: advanced, stage: 2, sources: [statement_of_faith], denom_field: theology.spirit_baptism}
+  theology.salvation_framework: {label: Calvinist / Arminian, values: [reformed, arminian_wesleyan, mixed, other], ask: advanced, stage: 2, sources: [statement_of_faith, network_directory, sermon_transcript], denom_field: theology.election, observed: true}
+  theology.justification:    {label: Justification, values: [faith_alone, faith_and_works, sacramental_process], ask: advanced, stage: 2, sources: [statement_of_faith], denom_field: theology.justification}
+  theology.salvation_scope:  {label: Who can be saved, values: [exclusivist, inclusivist, pluralist], ask: advanced, stage: 2, sources: [statement_of_faith], denom_field: theology.salvation_summary}
+  theology.end_times:        {label: End times, values: [premillennial_dispensational, premillennial_historic, amillennial, postmillennial], ask: advanced, stage: 2, sources: [statement_of_faith, sermon_transcript], denom_field: theology.millennium}
+  theology.covenant_framework: {label: Covenant / dispensational, values: [covenantal, dispensational, other], ask: advanced, stage: 2, sources: [statement_of_faith, network_directory]}
+  theology.creeds:           {label: Historic creeds, values: [confessional, uses_creeds, no_creed_but_bible], ask: advanced, stage: 2, sources: [website, livestream], denom_field: theology.doctrinal_standards}
+
+  # --- governance ---
+  polity.governance:         {label: Who leads, values: [episcopal_bishops, presbyterian_elders, congregational_vote, elder_led_independent, pastor_led, board_led], ask: advanced, stage: 2, sources: [website, denomination_locator], denom_field: governance.polity}
+  polity.leaders:            {label: Public leaders, values: [names_roles_tenure], ask: never, stage: 2, sources: [staff_page, wayback],
+                              note: "Publicly listed leaders only (pastors, elders as listed). Tenure from Wayback snapshots. No pay, no congregant names."}
+
+  # --- community and ministries ---
+  community.small_groups:    {label: Small groups, values: [present, absent], ask: standard, stage: 2, sources: [website, church_center, calendar],
+                              question: "Is it important to have small groups or Bible studies during the week?"}
+  community.kids:            {label: Kids ministry, values: [present, absent], ask: standard, stage: 2, sources: [website, church_center], denom_field: practice_culture.children_programs,
+                              question: "Are you bringing kids or teens? What ages?"}
+  community.young_adults:    {label: College / young adults, values: [present, absent], ask: standard, stage: 2, sources: [website, church_center, calendar],
+                              question: "Is a college or young-adults group important (for you or the person you're helping)?"}
+  community.youth:           {label: Youth ministry, values: [present, absent], ask: standard, stage: 2, sources: [website, church_center],
+                              question: "Teenagers in the picture? Is a youth group important?"}
+  community.ministries:      {label: Ministries, values: [ministry_list], ask: never, stage: 2, sources: [website, calendar, church_center]}
+  community.outreach:        {label: Local outreach, values: [high, some, low], ask: standard, stage: 2, sources: [website, calendar, news], denom_field: practice_culture.missions,
+                              question: "How much do you want the church involved in serving the local community?"}
+  community.missions:        {label: Missions / planting, values: [local, international, church_planting], ask: if_raised, stage: 3, sources: [website, news], denom_field: practice_culture.missions}
+  community.recovery:        {label: Recovery ministry, values: [present, absent], ask: if_raised, stage: 2, sources: [website, church_center]}
+  community.social_events:   {label: Social life, values: [frequent, some, rare], ask: if_raised, stage: 2, sources: [calendar, website]}
+  community.giving:          {label: Giving expectations, values: [tithe_expected, encouraged, rarely_mentioned], ask: if_raised, stage: 3, sources: [website, sermon_transcript], denom_field: practice_culture.tithing, observed: true}
+  community.communication:   {label: Communication, values: [social, newsletter, app, email], ask: never, stage: 2, sources: [website]}
+
+  # --- stated social positions (stated_only rule) ---
+  social.abortion:           {label: Abortion (stated), values: [pro_life, pro_choice, nuanced], ask: if_raised, stage: 2, sources: [statement_of_faith, website], denom_field: practice_culture.abortion, sensitive: true}
+  social.immigration:        {label: Immigration (stated), values: [stated_position_text], ask: if_raised, stage: 3, sources: [website, news], sensitive: true}
+  social.church_state:       {label: Church and state, values: [separation_emphasized, christian_nation_emphasized, unstated], ask: if_raised, stage: 3, sources: [website, sermon_transcript], denom_field: practice_culture.political_engagement, sensitive: true}
+  social.pacifism:           {label: Peace / nonviolence, values: [pacifist, just_war], ask: if_raised, stage: 2, sources: [statement_of_faith], denom_field: practice_culture.pacifism}
+
+  # --- leadership history and concerns (Deep) ---
+  history.leadership_changes: {label: Recent leadership changes, values: [stable, recent_change, frequent_changes], ask: if_raised, stage: 3, sources: [wayback, news, staff_page]}
+  history.ministry_changes:  {label: Ministries started / ended, values: [change_list], ask: never, stage: 3, sources: [wayback, calendar]}
+  history.statement_changes: {label: Changed statement of faith, values: [unchanged, changed], ask: never, stage: 3, sources: [wayback]}
+  concerns.public_reports:   {label: Public reports, values: [report_list], ask: never, stage: 3, sources: [news],
+                              note: "Only items reported by a named news outlet, cited and dated, stated neutrally. Never from reviews alone. Can be empty."}
+
+# ---------------------------------------------------------------- cut (D8)
+cut:
+  - {was: "staff salaries / pay", why: "people data; guardrail"}
+  - {was: "congregation age / race / ethnicity / education (community.age_mix, community.ethnic_mix)", why: "congregant demographics; guardrail"}
+  - {was: "dress code from photos of congregants (worship.dress_norm)", why: "inference from images of congregants incl. minors"}
+  - {was: "worship team membership", why: "names/gender of volunteers"}
+  - {was: "party affiliation (Republican / Democrat)", why: "pastoral/political judgment; replaced by preaching.politics_frequency and stated social positions"}

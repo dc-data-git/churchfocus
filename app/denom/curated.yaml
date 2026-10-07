@@ -1,0 +1,55 @@
+# Hand-curated identity data for the largest US groups (stable facts; reviewed by Katie).
+# Used for identity.branch / identity.tradition priors and name matching when the KB field is empty.
+# Keys are KB group ids. aliases: extra names/abbreviations seen in church names and on church websites.
+groups:
+  catholic:            {branch: catholic, tradition: other, aliases: [Roman Catholic, Catholic Church, Catholic Parish, RCC]}
+  nondenominational:   {branch: evangelical_protestant, tradition: nondenominational_evangelical, aliases: [non-denominational, nondenominational, non denominational]}
+  sbc:                 {branch: evangelical_protestant, tradition: baptist, aliases: [Southern Baptist, SBC, Southern Baptist Church]}
+  umc:                 {branch: mainline_protestant, tradition: methodist_wesleyan, aliases: [United Methodist, UMC]}
+  lds:                 {branch: restorationist, tradition: other, aliases: [Latter-day Saints, LDS, Mormon]}
+  elca:                {branch: mainline_protestant, tradition: lutheran, aliases: [ELCA, Evangelical Lutheran]}
+  ag:                  {branch: pentecostal_charismatic, tradition: pentecostal, aliases: [Assembly of God, Assemblies of God, AG]}
+  jw:                  {branch: restorationist, tradition: other, aliases: [Kingdom Hall, "Jehovah's Witnesses"]}
+  usrc2020_302:        {branch: black_protestant, tradition: baptist, aliases: [National Missionary Baptist]}
+  lcms:                {branch: evangelical_protestant, tradition: lutheran, aliases: [LCMS, Missouri Synod]}
+  episcopal:           {branch: mainline_protestant, tradition: anglican_episcopal, aliases: [Episcopal Church, Episcopal]}
+  nbcusa:              {branch: black_protestant, tradition: baptist, aliases: [National Baptist Convention USA, NBCUSA]}
+  pcusa:               {branch: mainline_protestant, tradition: presbyterian_reformed, aliases: [PC(USA), PCUSA, Presbyterian Church USA]}
+  churches_of_christ:  {branch: evangelical_protestant, tradition: restoration_christian, aliases: [Church of Christ]}
+  independent_christian: {branch: evangelical_protestant, tradition: restoration_christian, aliases: [Christian Church, Independent Christian Church]}
+  adventist:           {branch: evangelical_protestant, tradition: adventist, aliases: [Seventh-day Adventist, Seventh Day Adventist, SDA]}
+  abcusa:              {branch: mainline_protestant, tradition: baptist, aliases: [American Baptist, ABCUSA]}
+  ame:                 {branch: black_protestant, tradition: methodist_wesleyan, aliases: [AME, African Methodist Episcopal]}
+  ucc:                 {branch: mainline_protestant, tradition: other, aliases: [UCC, United Church of Christ]}
+  cogic:               {branch: black_protestant, tradition: pentecostal, aliases: [COGIC, Church of God in Christ]}
+  nazarene:            {branch: evangelical_protestant, tradition: holiness, aliases: [Nazarene, Church of the Nazarene]}
+  cog_cleveland:       {branch: pentecostal_charismatic, tradition: pentecostal, aliases: [Church of God Cleveland]}
+  usrc2020_123:        {branch: evangelical_protestant, tradition: holiness, aliases: [Church of God Anderson]}
+  cma:                 {branch: evangelical_protestant, tradition: holiness, aliases: [Alliance Church, C&MA, CMA, Christian and Missionary Alliance]}
+  wels:                {branch: evangelical_protestant, tradition: lutheran, aliases: [WELS, Wisconsin Synod]}
+  disciples:           {branch: mainline_protestant, tradition: restoration_christian, aliases: [Disciples of Christ, Christian Church (Disciples of Christ)]}
+  greek_orthodox:      {branch: eastern_orthodox, tradition: other, aliases: [Greek Orthodox]}
+  pca:                 {branch: evangelical_protestant, tradition: presbyterian_reformed, aliases: [PCA, Presbyterian Church in America]}
+  foursquare:          {branch: pentecostal_charismatic, tradition: pentecostal, aliases: [Foursquare, Foursquare Church]}
+  usrc2020_031:        {branch: anabaptist, tradition: anabaptist_mennonite, aliases: [Amish]}
+  wesleyan:            {branch: evangelical_protestant, tradition: holiness, aliases: [Wesleyan Church, Wesleyan]}
+  usrc2020_005:        {branch: black_protestant, tradition: methodist_wesleyan, aliases: [AME Zion, AMEZ]}
+  usrc2020_101:        {branch: black_protestant, tradition: methodist_wesleyan, aliases: [CME, Christian Methodist Episcopal]}
+  usrc2020_364:        {branch: black_protestant, tradition: baptist, aliases: [Progressive National Baptist, PNBC]}
+  usrc2020_ffr:        {branch: pentecostal_charismatic, tradition: pentecostal, aliases: [Full Gospel Christian Assemblies]}
+  rca:                 {branch: mainline_protestant, tradition: presbyterian_reformed, aliases: [RCA, Reformed Church in America]}
+  usrc2020_301:        {branch: black_protestant, tradition: baptist, aliases: [National Baptist Convention of America]}
+  usrc2020_255:        {branch: evangelical_protestant, tradition: lutheran, aliases: [LCMC]}
+  coptic:              {branch: oriental_orthodox, tradition: other, aliases: [Coptic Orthodox, Coptic]}
+  usrc2020_223:        {branch: evangelical_protestant, tradition: baptist, aliases: [Free Will Baptist]}
+  vineyard:            {branch: pentecostal_charismatic, tradition: charismatic_nondenom, aliases: [Vineyard, Vineyard Church]}
+  ecc:                 {branch: evangelical_protestant, tradition: other, aliases: [Evangelical Covenant, Covenant Church, ECC]}
+  crcna:               {branch: evangelical_protestant, tradition: presbyterian_reformed, aliases: [Christian Reformed, CRC, CRCNA]}
+  usrc2020_017:        {branch: evangelical_protestant, tradition: baptist, aliases: [American Baptist Association]}
+  salvationarmy:       {branch: evangelical_protestant, tradition: holiness, aliases: [Salvation Army]}
+  usrc2020_232:        {branch: black_protestant, tradition: baptist, aliases: [Full Gospel Baptist]}
+  brethren:            {branch: anabaptist, tradition: anabaptist_mennonite, aliases: [Church of the Brethren]}
+  usrc2020_204:        {branch: oriental_orthodox, tradition: other, aliases: [Ethiopian Orthodox]}
+  usrc2020_050:        {branch: oriental_orthodox, tradition: other, aliases: [Armenian Apostolic, Armenian Church]}
+  mcusa:               {branch: anabaptist, tradition: anabaptist_mennonite, aliases: [Mennonite Church USA, MC USA, Mennonite Church]}
+  usmb:                {branch: anabaptist, tradition: anabaptist_mennonite, aliases: [Mennonite Brethren, USMB, MB Church]}
