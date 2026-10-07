@@ -186,3 +186,14 @@ def test_same_name():
     assert pl._same_name("Assemblies of God", "Assemblies of God")
     assert pl._same_name("Church of God (Anderson, Indiana)", "Church of God (Anderson, Indiana)")
     assert not pl._same_name("Full Gospel", "Full Gospel Christian Assemblies International")
+
+
+def test_verify_normalize_gpt_oss_shapes():
+    from denomkb.verify import normalize
+    assert normalize({"verdicts": [{"id": 1, "verdict": "supported"}]}) == \
+        {"verdicts": [{"id": 1, "verdict": "supported", "reason": ""}]}
+    got = normalize({"1": {"verdict": "Partial", "reason": "r"}, "2": "unsupported", "x": "bogus"})
+    assert got == {"verdicts": [{"id": 1, "verdict": "partial", "reason": "r"},
+                                {"id": 2, "verdict": "unsupported", "reason": ""}]}
+    from denomkb.llm import _strip_fences
+    assert _strip_fences('```json\n{"a": 1}\n```') == '{"a": 1}'

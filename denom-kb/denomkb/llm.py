@@ -109,7 +109,8 @@ class LLM:
                       model: str | None = None,
                       fake: Callable[[list[dict]], Any] | None = None,
                       check: Callable[[Any], str | None] | None = None,
-                      partial: bool = False, think=None) -> Any:
+                      partial: bool = False, think=None,
+                      normalize: Callable[[Any], Any] | None = None) -> Any:
         """Return a JSON object matching `schema`.
 
         `check` is an optional semantic validator returning an error string or None
@@ -142,7 +143,9 @@ class LLM:
             p_tok += pt
             c_tok += ct
             try:
-                value = json.loads(content)
+                value = json.loads(_strip_fences(content))
+                if normalize:
+                    value = normalize(value)      # models that ignore the format: repair the shape first
                 jsonschema.validate(value, schema)
                 last_valid = value
                 err = check(value) if check else None
@@ -174,3 +177,12 @@ class LLM:
                          headers={"Authorization": f"Bearer {self.api_key}"} if self.api_key else {})
         r.raise_for_status()
         return "models available: " + ", ".join(m["id"] for m in r.json().get("data", []))
+
+
+def _strip_fences(s: str) -> str:
+    s = s.strip()
+    if s.startswith("```"):
+        s = s.split("\n", 1)[1] if "\n" in s else s[3:]
+        if s.rstrip().endswith("```"):
+            s = s.rstrip()[:-3]
+    return s.strip()

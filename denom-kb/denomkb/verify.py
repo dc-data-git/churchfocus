@@ -29,6 +29,36 @@ def needs_check(p: dict, model: str) -> bool:
     return not v or v.get("model") != model
 
 
+VERDICTS = {"supported", "partial", "unsupported"}
+
+
+def normalize(v):
+    """Coerce near-miss shapes from models that ignore the JSON schema (seen with gpt-oss on Ollama cloud):
+    {"verdicts": [{"id": 1, "verdict": "supported"}]}            (missing reason)
+    {"1": {"verdict": "supported", "reason": "..."}, "2": ...}    (keyed by id)
+    {"1": "supported", ...} / {"verdicts": {"1": ...}}"""
+    if isinstance(v, list):
+        v = {"verdicts": v}
+    if not isinstance(v, dict):
+        return v
+    items = v.get("verdicts", v)
+    if isinstance(items, dict):
+        items = [({"id": k, **x} if isinstance(x, dict) else {"id": k, "verdict": x}) for k, x in items.items()]
+    out = []
+    for x in items if isinstance(items, list) else []:
+        if not isinstance(x, dict):
+            continue
+        try:
+            i = int(str(x.get("id", "")).strip("[] "))
+        except ValueError:
+            continue
+        verdict = str(x.get("verdict", "")).strip().lower()
+        if verdict not in VERDICTS:
+            continue
+        out.append({"id": i, "verdict": verdict, "reason": str(x.get("reason", ""))[:300]})
+    return {"verdicts": out}
+
+
 def _claims_block(g_name: str, kb_fields: dict, batch: list[dict]) -> str:
     lines = [f"GROUP: {g_name}", ""]
     for i, p in enumerate(batch, 1):
@@ -75,7 +105,7 @@ def run(cfg: dict, root, kb, llm, groups: list[dict], dry_run: bool = False) -> 
                 return {"verdicts": out}
             try:
                 v = llm.complete_json("verify", msgs, prompts.VERIFY_SCHEMA, model=model, fake=fake, check=check,
-                                      partial=True, think=think)
+                                      partial=True, think=think, normalize=normalize)
             except LLMError as e:
                 log.warning("verifier unavailable (%s); stopping. Re-run `verify` later to resume.", e)
                 stats["stopped_early"] = True
