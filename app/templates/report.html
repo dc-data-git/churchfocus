@@ -94,7 +94,7 @@
           <td>
             {{ row.stated.value }}
             {% if row.stated.quote %}<blockquote>"{{ row.stated.quote }}"</blockquote>{% endif %}
-            <div class="tier">tier {{ row.stated.tier }}</div>
+            <div class="tier">tier {{ row.stated.tier }}{% set su = row.stated.url | safe_url %}{% if su %} · <a href="{{ su }}" rel="noopener nofollow">source</a>{% endif %}</div>
           </td>
           <td>
             {{ row.observed.value }}
@@ -150,7 +150,7 @@
     <h2>Evidence collected</h2>
     <table>
       <thead>
-        <tr><th>Feature</th><th>Value</th><th>Tier</th><th>How</th><th>Quote / note</th></tr>
+        <tr><th>Feature</th><th>Value</th><th>Tier</th><th>How</th><th>Quote / note</th><th>Source</th></tr>
       </thead>
       <tbody>
         {% for ev in known_evidence %}
@@ -160,6 +160,8 @@
           <td>{{ ev.tier }}</td>
           <td>{{ ev.how }}</td>
           <td>{% if ev.quote %}"{{ ev.quote }}"{% elif ev.note %}{{ ev.note }}{% else %}—{% endif %}</td>
+          <td>{% set u = ev.url | safe_url %}{% if u %}<a href="{{ u }}" rel="noopener nofollow">{{ ev.source_kind.replace('_', ' ') }}</a>{% else %}{{ ev.source_kind.replace('_', ' ') }}{% endif %}
+            {% if ev.checked_at %}<div class="tier">{{ (ev.checked_at|string)[:10] }}</div>{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -169,6 +171,7 @@
 
   <footer>
     <p>Church Search — evidence-based research report. Session {{ report.profile_session }}.</p>
+    <p>Church name and address from Google Maps. Tiers: A = the church's own words · B = independent source · C = weak signal · D = inferred from sermons · "typical for" = denomination default, may differ locally.</p>
     <p class="no-print">Use your browser's Print → Save as PDF for a shareable copy.</p>
   </footer>
 </body>

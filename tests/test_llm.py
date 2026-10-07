@@ -78,3 +78,38 @@ def test_fake_web_fixture(monkeypatch, tmp_path):
     result = fetch("https://fixture.church/about")
     assert result["status"] == 200
     assert "about our church" in result["text"].lower()
+
+
+def test_complete_json_adds_json_instruction_for_openai(monkeypatch):
+    """R1: OpenAI json_object mode 400s unless the word JSON appears in the messages."""
+    from app import llm
+    seen = {}
+
+    def fake_chat(model, messages, **kw):
+        seen["messages"], seen["kw"] = messages, kw
+        return '{"ok": true}', 1, 1
+
+    monkeypatch.setattr(llm, "_chat", fake_chat)
+    monkeypatch.setattr(llm, "get_settings", lambda: type("S", (), {"llm_backend": "openai", "openai_model_fast": "m", "openai_model_strong": "m",
+                                                                    "data_dir": __import__("pathlib").Path(__import__("tempfile").mkdtemp())})())
+    llm.complete_json("crisis_check", [{"role": "user", "content": "hello"}], {"type": "object", "required": ["ok"], "properties": {"ok": {"type": "boolean"}}})
+    assert "json" in seen["messages"][0]["content"].lower()
+    assert seen["kw"]["response_format"] == {"type": "json_object"}
+
+
+def test_web_search_reads_url_citations(monkeypatch):
+    """R9: results come from url_citation annotations, not lines of prose."""
+    from types import SimpleNamespace as NS
+
+    from app import llm
+    ann = NS(type="url_citation", url="https://umc.org/church/123", title="First UMC", start_index=0, end_index=20)
+    resp = NS(output=[NS(content=[NS(type="output_text", text="First UMC in Hesston is a member.", annotations=[ann])])],
+              usage=NS(input_tokens=5, output_tokens=5))
+
+    class FakeClient:
+        def __init__(self, **kw):
+            self.responses = NS(create=lambda **k: resp)
+
+    monkeypatch.setattr("openai.OpenAI", FakeClient)
+    out = llm.web_search("First UMC Hesston")
+    assert out and out[0]["url"] == "https://umc.org/church/123" and out[0]["title"] == "First UMC"

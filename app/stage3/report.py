@@ -177,11 +177,19 @@ def db_get_evidence(church_id: str) -> list[Evidence]:
     return db.get_evidence(church_id)
 
 
+def safe_url(url: str | None) -> str:
+    """Only http(s) links from scraped data reach an href (no javascript: etc.)."""
+    u = (url or "").strip()
+    return u if u.lower().startswith(("http://", "https://")) else ""
+
+
 def _jinja_env() -> Environment:
-    return Environment(
+    env = Environment(
         loader=FileSystemLoader(ROOT / "app" / "templates"),
         autoescape=select_autoescape(["html", "xml"]),
     )
+    env.filters["safe_url"] = safe_url
+    return env
 
 
 def render_html(report: ChurchReport, *, narrative: dict[str, Any] | None = None) -> str:

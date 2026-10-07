@@ -99,3 +99,15 @@ def test_osm_search_same_shape_and_denomination_hint(osm_client):
     assert results[0]["osm_denomination"] == "Mennonite"
     for key in ("church_id", "name", "address", "lat", "lng", "distance_miles"):
         assert key in results[0]
+
+
+def test_geocode_city_without_business_status(places_client):
+    # Google returns no businessStatus for a city; geocode must still work (R3)
+    lat, lng = places.geocode("Hesston, KS, 15 miles")
+    assert round(lat, 2) == 38.14
+
+
+def test_clean_origin_strips_distance():
+    assert places.clean_origin("Hesston, KS, 15 miles") == "Hesston, KS"
+    assert places.clean_origin("67062 within 20 mi") == "67062"
+    assert places.clean_origin("Wichita") == "Wichita"

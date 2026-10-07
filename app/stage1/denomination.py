@@ -9,7 +9,12 @@ from app.models import Church, DenomGuess, Evidence, MatchResult, PreferenceProf
 
 from . import osm, places
 
-NON_DENOM = re.compile(r"\b(non[- ]?denominational|nondenominational|independent)\b", re.I)
+NON_DENOM = re.compile(r"\b(non[- ]?denominational|nondenominational|independent)\b", re.I)   # church NAMES
+NON_DENOM_TEXT = re.compile(r"\b(non[- ]?denominational|nondenominational)\b", re.I)          # page text ("independent" is too common)
+
+# R9: the locator cross-search costs ~7 paid web searches per church for little gain until search results
+# carry reliable URLs. Off for the demo (BUILD_PLAN cut-order #3); flip to True to re-enable.
+LOCATOR_ENABLED = False
 
 # domain -> KB id (contracts/source_registry.md)
 LOCATORS: list[tuple[str, str]] = [
@@ -76,6 +81,32 @@ def _locator_search(name: str, city: str, kb) -> DenomGuess | None:
     return None
 
 
+DENOM_CLASSIFY_SCHEMA = {
+    "type": "object",
+    "required": ["label", "kb_candidates", "independent", "confidence", "quote"],
+    "properties": {
+        "label": {"type": "string"},
+        "kb_candidates": {"type": "array", "items": {"type": "string"}},
+        "independent": {"type": "boolean"},
+        "confidence": {"type": "number"},
+        "quote": {"type": "string"},
+        "url": {"type": "string"},
+    },
+}
+
+
+def _kb_menu(kb, k: int = 60) -> str:
+    """Largest Christian groups as 'id: name' lines, so the model can pick KB ids (denom_classify.v1)."""
+    ids = sorted((g for g in kb.groups if kb.is_christian(g)),
+                 key=lambda g: -(kb.groups[g]["census_2020"].get("adherents") or 0))[:k]
+    return "\n".join(f"{g}: {kb.groups[g]['name']}" for g in ids)
+
+
+def _verbatim(quote: str, text: str) -> bool:
+    from rapidfuzz import fuzz
+    return bool(quote) and fuzz.partial_ratio(quote.lower(), text.lower()) >= 90
+
+
 def _website_classify(name: str, website: str, kb) -> DenomGuess:
     from app import llm, web
 
@@ -85,60 +116,41 @@ def _website_classify(name: str, website: str, kb) -> DenomGuess:
         return DenomGuess(label="Unknown (likely independent)", confidence=0.2, method="unknown")
 
     text = page.get("text") or ""
-    if NON_DENOM.search(text):
-        return DenomGuess(denomination_id=None, label="Non-denominational", confidence=0.85, method="website")
+    if not text.strip():
+        return DenomGuess(label="Unknown (website unreadable)", confidence=0.2, method="unknown")
+    if NON_DENOM_TEXT.search(text):
+        m = NON_DENOM_TEXT.search(text)
+        snippet = text[max(0, m.start() - 80): m.end() + 80].strip()
+        return DenomGuess(denomination_id=None, label="Non-denominational", confidence=0.85, method="website",
+                          evidence=[Evidence(feature="identity.denomination", value="nondenominational", tier="A",
+                                             quote=snippet, url=website, source_kind="website", how="stated")])
 
     try:
         out = llm.complete_json(
             "denom_classify",
-            [{"role": "user", "content": f"Church: {name}\nWebsite text:\n{text[:8000]}"}],
-            {
-                "type": "object",
-                "required": ["denomination_label", "confidence", "quote"],
-                "properties": {
-                    "denomination_label": {"type": "string"},
-                    "denomination_id": {"type": "string"},
-                    "confidence": {"type": "number"},
-                    "quote": {"type": "string"},
-                    "features": {"type": "array"},
-                },
-            },
+            [{"role": "system", "content": llm.load_prompt("denom_classify.v1")},
+             {"role": "user", "content": f"Church: {name}\nURL: {website}\n\nKB list (id: name):\n{_kb_menu(kb)}"
+                                         f"\n\nExcerpts from the church's website:\n{text[:8000]}"}],
+            DENOM_CLASSIFY_SCHEMA,
             tier="fast",
         )
     except Exception:
         return DenomGuess(label="Unknown (likely independent)", confidence=0.2, method="unknown")
 
-    quote = out.get("quote") or ""
+    quote = (out.get("quote") or "").strip()
     conf = float(out.get("confidence") or 0.0)
-    label = out.get("denomination_label") or "Unknown"
-    did = out.get("denomination_id")
+    label = out.get("label") or "Unknown"
+    cands = [c for c in (out.get("kb_candidates") or []) if c in kb.groups]
+    did = cands[0] if cands else None
     evidence: list[Evidence] = []
-
-    if quote:
-        evidence.append(
-            Evidence(
-                feature="identity.denomination",
-                value=did or label,
-                tier="A",
-                quote=quote[:240],
-                url=website,
-                source_kind="website",
-                how="stated",
-            )
-        )
-    for feat in out.get("features") or []:
-        if isinstance(feat, dict) and feat.get("feature") and feat.get("value"):
-            evidence.append(
-                Evidence(
-                    feature=feat["feature"],
-                    value=feat["value"],
-                    tier="A",
-                    quote=feat.get("quote", quote)[:240],
-                    url=website,
-                    source_kind="website",
-                    how="stated",
-                )
-            )
+    if quote and _verbatim(quote, text):
+        evidence.append(Evidence(feature="identity.denomination", value=did or label, tier="A", quote=quote[:240],
+                                 url=website, source_kind="website", how="stated"))
+    else:
+        conf = min(conf, 0.5)   # no verifiable quote -> never "confident"
+    if out.get("independent") and not did:
+        return DenomGuess(denomination_id=None, label="Non-denominational", confidence=max(min(conf, 0.85), 0.6),
+                          method="website", evidence=evidence)
 
     if did and did in kb.groups:
         return DenomGuess(denomination_id=did, label=kb.groups[did]["name"], confidence=min(conf, 0.9), method="website", evidence=evidence)
@@ -149,7 +161,7 @@ def _website_classify(name: str, website: str, kb) -> DenomGuess:
         return DenomGuess(
             denomination_id=top["id"],
             label=top["name"],
-            confidence=max(score_to_confidence(top["score"]), min(conf, 0.9)),
+            confidence=max(score_to_confidence(top["score"]), min(conf, 0.9)) if evidence else min(conf, 0.5),
             method="website",
             evidence=evidence,
         )
@@ -201,7 +213,7 @@ def resolve(candidate: dict) -> DenomGuess:
             if guess.confidence > best.confidence:
                 best = guess
 
-    if best.confidence < 0.8:
+    if LOCATOR_ENABLED and best.confidence < 0.8:
         locator = _locator_search(name, _city_from_address(address), kb)
         if locator:
             if locator.confidence >= 0.8:
@@ -219,7 +231,7 @@ def resolve(candidate: dict) -> DenomGuess:
     if best.confidence < 0.8 and website:
         try:
             page = __import__("app.web", fromlist=["fetch"]).fetch(website, max_chars=8000)
-            if NON_DENOM.search(page.get("text") or ""):
+            if NON_DENOM_TEXT.search(page.get("text") or ""):
                 return DenomGuess(denomination_id=None, label="Non-denominational", confidence=0.8, method="website")
         except Exception:
             pass
@@ -277,7 +289,11 @@ def light_search(profile: PreferenceProfile) -> list[tuple[Church, MatchResult]]
     with ThreadPoolExecutor(max_workers=8) as pool:
         futs = {pool.submit(resolve, c): c for c in top}
         for fut in as_completed(futs):
-            resolved.append((futs[fut], fut.result()))
+            try:
+                guess = fut.result()
+            except Exception:   # one bad website must not fail the whole search
+                guess = DenomGuess(label="Unknown", confidence=0.2, method="unknown")
+            resolved.append((futs[fut], guess))
 
     results: list[tuple[Church, MatchResult]] = []
     for cand, denom in resolved:

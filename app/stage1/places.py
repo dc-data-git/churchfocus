@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import math
+import re
+import time
 from typing import Any
 
 import httpx
@@ -96,7 +98,7 @@ def search_churches(
 
         data = _search_page(body)
         for place in data.get("places") or []:
-            if place.get("businessStatus") != "OPERATIONAL":
+            if str(place.get("businessStatus", "")).startswith("CLOSED"):   # missing status = keep
                 continue
             parsed = _parse_place(place, lat, lng)
             if parsed["church_id"]:
@@ -107,27 +109,42 @@ def search_churches(
         page_token = data.get("nextPageToken")
         if not page_token or len(seen) >= max_results:
             break
+        time.sleep(1.5)   # page tokens can take a moment to become valid
 
     return sorted(seen.values(), key=lambda c: c["distance_miles"])
 
 
+_MILES_RE = re.compile(r"[,;]?\s*(within\s+)?\d+(\.\d+)?\s*(mi|mile|miles)\b.*$", re.I)
+
+
+class GeocodeError(ValueError):
+    """The origin text could not be turned into a location. Message is safe to show the user."""
+
+
+def clean_origin(text: str) -> str:
+    """'Hesston, KS, 15 miles' -> 'Hesston, KS'."""
+    return _MILES_RE.sub("", text or "").strip(" ,;")
+
+
 def geocode(text: str) -> tuple[float, float]:
-    """Geocode via Places Text Search; return first OPERATIONAL result location."""
+    """Geocode via Places Text Search; first result with a location.
+    (No businessStatus filter: Google only sends that field for businesses, never for a city or address.)"""
+    q = clean_origin(text)
+    if not q:
+        raise GeocodeError("Please tell me a town, ZIP code or address to search from.")
     settings = get_settings()
     resp = _get_client().post(
         PLACES_URL,
-        json={"textQuery": text, "pageSize": 5},
+        json={"textQuery": q, "pageSize": 5},
         headers={
             "Content-Type": "application/json",
             "X-Goog-Api-Key": settings.google_places_api_key,
-            "X-Goog-FieldMask": "places.location,places.businessStatus",
+            "X-Goog-FieldMask": "places.location,places.formattedAddress",
         },
     )
     resp.raise_for_status()
     for place in resp.json().get("places") or []:
-        if place.get("businessStatus") != "OPERATIONAL":
-            continue
         loc = place.get("location") or {}
         if "latitude" in loc and "longitude" in loc:
             return loc["latitude"], loc["longitude"]
-    raise ValueError(f"no geocode result for {text!r}")
+    raise GeocodeError(f"I couldn't find \"{q}\" on the map. Try a town and state or a ZIP code.")

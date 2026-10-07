@@ -31,7 +31,7 @@ class FakeLLM:
         out = self.responses[task]
         return out() if callable(out) else out
 
-    def chat_tools(self, task: str, messages: list[dict], tools: list[dict], tier: str = "strong") -> dict:
+    def chat_tools(self, task: str, messages: list[dict], tools: list[dict], tier: str = "strong", **kw: Any) -> dict:
         self.calls.append({"task": task, "messages": messages, "tools": tools, "tier": tier})
         key = f"{task}:tools"
         if key in self.responses:

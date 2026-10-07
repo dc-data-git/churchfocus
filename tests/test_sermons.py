@@ -241,7 +241,7 @@ def test_analyse_sermons_aggregates_women_preach(tmp_data, monkeypatch):
     assert wp.value == "occasionally"
     assert wp.tier == "D"
     assert wp.how == "observed"
-    assert wp.note == "2 of 6 sermons"
+    assert wp.note.startswith("2 of 6 sermons")
 
     assert by_feature["logistics.sermon_length"].value == "20_35"
     assert by_feature["preaching.style"].value == "expository"
@@ -281,7 +281,27 @@ def test_analyse_sermons_with_fake_llm(tmp_data, monkeypatch):
     )
     assert len(fake.calls) == 1
     assert fake.calls[0]["task"] == "sermon_analyse"
-    assert out["evidence"][0].feature == "women.preach"
+    feats = [e.feature for e in out["evidence"]]
+    assert "women.preach" not in feats          # 1 identifiable speaker < 5: no claim (R7)
+    assert "preaching.politics_frequency" in feats
+
+
+def test_unknown_speakers_never_mean_women_never_preach(tmp_data, monkeypatch):
+    unknown = {"speaker": "", "speaker_role": "unknown", "speaker_gender": "unknown", "minutes": 30, "style": "topical",
+               "main_texts": [], "scripture_density": "medium", "audience": "mixed", "politics_mentions": 0,
+               "politics_examples": [], "topics": [], "stated_positions": []}
+    monkeypatch.setattr("app.stage3.sermons.complete_json", lambda *a, **k: dict(unknown))
+    out = sermons.analyse_sermons([{"title": f"S{i}", "text": "x", "minutes": 30} for i in range(8)],
+                                  ["women.preach", "preaching.style"], church_id="c1")
+    feats = {e.feature: e for e in out["evidence"]}
+    assert "women.preach" not in feats
+    from app.features import data_points
+    assert data_points(feats["preaching.style"].note) == 8    # notes are countable -> can settle
+
+
+def test_audio_suffix_from_url():
+    assert sermons._audio_suffix("https://x.org/a/sermon.m4a?x=1") == ".m4a"
+    assert sermons._audio_suffix("https://x.org/a/play", "audio/mpeg") == ".mp3"
 
 
 def test_transcribe_sermons_parallel_respects_cap(tmp_data, monkeypatch):

@@ -12,6 +12,7 @@ def _log_path(session_id: str, church_id: str | None) -> Path:
     logs = get_settings().data_dir / "logs" / session_id
     logs.mkdir(parents=True, exist_ok=True)
     name = church_id if church_id else "session"
+    name = "".join(c if (c.isalnum() or c in "-_.") else "_" for c in name)   # "osm:123" is not a valid Windows filename
     return logs / f"{name}.jsonl"
 
 

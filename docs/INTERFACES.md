@@ -33,6 +33,7 @@ church-discorvery-hackathon/
     stage3/tools.py            # tool functions exposed to the agent (§4)
     stage3/sermons.py          # find feeds, download, transcribe, analyse
     stage3/report.py           # Church Report HTML/JSON
+    evidence_rules.py          # allowed values + marriage rule, shared by Stage 2 and Stage 3
     match.py                   # deterministic matcher — only place that scores
     web.py                     # polite fetcher (robots, rate limit, cache) — only place that does HTTP to non-API sites
     denom/kb.py                # denomination KB access (in-process)
@@ -229,11 +230,14 @@ def search_web(ctx, query: str) -> dict                     # {results: [...]}
 def wayback_snapshots(ctx, url: str, years: list[int]) -> dict    # {snapshots: [{timestamp, url}]}
 def denomination_lookup(ctx, name_or_id: str) -> dict       # via denom/kb.py
 def denomination_locator_search(ctx, church_name: str, city: str) -> dict
-def find_sermon_feeds(ctx, church: Church) -> dict          # {feeds: [{url, kind: rss|youtube|sermonaudio|page}]}
-def get_sermons(ctx, feed_url: str, limit: int) -> dict     # {items: [{title, date, speaker, audio_url|video_url, transcript_url}]}
-def transcribe_sermon(ctx, item: dict) -> dict              # {text, minutes, speaker}
-def analyse_sermons(ctx, texts: list[dict], features: list[str]) -> dict   # observed Evidence list
-def record_evidence(ctx, evidence: list[Evidence]) -> dict  # writes to church evidence; returns settled/open lists
+def find_sermon_feeds(ctx) -> dict                      # {feeds: [{url, kind}]} for ctx["church"] (model never supplies a church)
+def get_sermons(ctx, feed_url: str, limit: int = 25) -> dict    # {sermons: [{sermon_id, title, date, speaker, has_audio, has_transcript}]}; items kept in ctx
+def transcribe_sermons(ctx, sermon_ids: list[str]) -> dict      # 3 in parallel; total capped by DEEP_MAX_SERMONS; transcripts kept in ctx
+def transcribe_sermon(ctx, sermon_id: str) -> dict              # wrapper over transcribe_sermons
+def analyse_sermons(ctx, sermon_ids: list[str] | None = None, features: list[str] | None = None) -> dict
+    # analyses transcripts in ctx and RECORDS observed tier-D evidence + verbatim tier-A stated positions itself
+def record_evidence(ctx, evidence: list[Evidence]) -> dict  # tiers A/B/C only; url required; 'unstated' allowed;
+                                                       # quote re-checked verbatim, then marriage rule (app/evidence_rules.py)
 def escalate(ctx, reason: str, message: str, questions: list[str]) -> dict
 def finish(ctx, summary: str) -> dict
 

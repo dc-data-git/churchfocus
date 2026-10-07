@@ -17,10 +17,22 @@ from app.db import cache_get, cache_put
 # Tests may monkeypatch this (BUILD_PLAN T0.1).
 RATE_LIMIT_SEC = 1.0
 
+# Guardrail G1: never open prayer, member-directory, login, giving or child check-in pages (R8 widened).
 _BLOCKLIST = re.compile(
     r"(?i)(/prayer|prayer[-_]?request|member[-_]?directory|/directory|/members|"
-    r"/login|sign[-_]?in|/give\b|/donate|/offering|child[-_]?check|check[-_]?in|/kidcheck)"
+    r"/login|sign[-_]?in|/give\b|/give/|/giving|online[-_]?giving|/generosity|/tithe|/donate|/offering|"
+    r"child[-_]?check|check[-_]?in|/kidcheck)"
 )
+# Whole hosts that are only giving / people-directory services.
+_BLOCKED_HOSTS = re.compile(r"(?i)(^|\.)(tithe\.ly|pushpay\.com|givelify\.com|onrealm\.org)$")
+_BLOCKED_HOST_PATHS = re.compile(r"(?i)churchcenter\.com/(people|giving|check-ins)")
+# A plain library UA gets 403 from many church hosts; identify honestly but browser-compatibly.
+_BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36"
+
+
+def _ua() -> str:
+    ua = get_settings().user_agent or "ChurchSearch/0.1"
+    return ua if ua.startswith("Mozilla/") else f"{_BROWSER_UA} {ua}"
 
 
 class Blocked(Exception):
@@ -61,7 +73,7 @@ def _get_client() -> httpx.Client:
         _client = httpx.Client(
             follow_redirects=True,
             timeout=30.0,
-            headers={"User-Agent": get_settings().user_agent},
+            headers={"User-Agent": _ua(), "Accept": "text/html,application/xhtml+xml,application/pdf;q=0.9,*/*;q=0.8"},
         )
     return _client
 
@@ -73,7 +85,10 @@ def set_client(client: httpx.Client | None) -> None:
 
 
 def _is_blocklisted(url: str) -> bool:
-    return bool(_BLOCKLIST.search(urlparse(url).path + "?" + urlparse(url).query))
+    u = urlparse(url)
+    host = u.netloc.lower().split(":")[0]
+    return bool(_BLOCKLIST.search(u.path + "?" + u.query) or _BLOCKED_HOSTS.search(host)
+                or _BLOCKED_HOST_PATHS.search(host + u.path))
 
 
 def _robots_allowed(url: str) -> bool:
@@ -93,7 +108,7 @@ def _robots_allowed(url: str) -> bool:
         except httpx.HTTPError:
             rp.allow_all = True
         _robots[domain] = rp
-    return _robots[domain].can_fetch(get_settings().user_agent, url)
+    return _robots[domain].can_fetch("ChurchSearch", url)
 
 
 def _rate_limit(url: str) -> None:
@@ -170,18 +185,45 @@ def fetch(url: str, max_chars: int = 20000) -> dict:
 
     _rate_limit(url)
 
-    # Read-only: GET only (G4).
-    resp = _get_client().get(url)
-    html = resp.text
-    text = _extract_text(html, url, max_chars)
-    links = _extract_links(html, str(resp.url))
+    # Read-only: GET only (G4). Network errors become an empty result, never an exception (callers stay simple).
+    try:
+        resp = _get_client().get(url)
+    except httpx.HTTPError as e:
+        return {"url": url, "status": 0, "text": "", "links": [], "from_cache": False, "error": f"{type(e).__name__}: {e}"}
 
-    result = {
-        "url": str(resp.url),
-        "status": resp.status_code,
-        "text": text,
-        "links": links,
-        "from_cache": False,
-    }
-    cache_put(url, json.dumps(result))
+    ctype = resp.headers.get("content-type", "").lower()
+    final_url = str(resp.url)
+    if _is_blocklisted(final_url):          # a redirect can land on a giving/login page
+        raise Blocked(f"blocklisted URL after redirect: {final_url}")
+    if not (200 <= resp.status_code < 300):
+        # R8: never cache or extract error pages (403 challenges, 404s) — they are not the church's words.
+        return {"url": final_url, "status": resp.status_code, "text": "", "links": [], "from_cache": False,
+                "error": f"HTTP {resp.status_code}"}
+    if "pdf" in ctype or final_url.lower().endswith(".pdf"):
+        text, links = _pdf_text(resp.content, max_chars), []
+    elif "html" in ctype or "xml" in ctype or not ctype or ctype.startswith("text/"):
+        html = resp.text
+        text = _extract_text(html, url, max_chars)
+        links = _extract_links(html, final_url)
+    else:  # images, audio, etc.
+        return {"url": final_url, "status": resp.status_code, "text": "", "links": [], "from_cache": False,
+                "error": f"unsupported content-type {ctype}"}
+
+    result = {"url": final_url, "status": resp.status_code, "text": text, "links": links, "from_cache": False}
+    if text.strip():                        # only cache real content
+        cache_put(url, json.dumps(result))
     return result
+
+
+def _pdf_text(data: bytes, max_chars: int) -> str:
+    """Statements of faith are often PDFs."""
+    try:
+        import io
+
+        from pypdf import PdfReader
+
+        reader = PdfReader(io.BytesIO(data))
+        text = "\n".join((pg.extract_text() or "") for pg in reader.pages[:20])
+        return scrub_pii(text)[:max_chars]
+    except Exception:
+        return ""

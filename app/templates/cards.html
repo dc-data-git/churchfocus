@@ -65,6 +65,7 @@
       <strong>{{ ev.feature }}</strong> = {{ ev.value }}
       <span class="tier tier-{{ ev.tier }}">tier {{ ev.tier }}</span>
       {% if ev.quote %}<br><q>{{ ev.quote }}</q>{% endif %}
+      {% if ev.url and (ev.url.startswith('http://') or ev.url.startswith('https://')) %} <a href="{{ ev.url }}" rel="noopener nofollow" target="_blank">source</a>{% endif %}
     </li>
     {% endfor %}
   </ul>
@@ -136,3 +137,5 @@
 })();
 </script>
 {% endif %}
+
+<p class="attribution" style="font-size:.8rem;color:#64748b">Church names and addresses from Google Maps.</p>

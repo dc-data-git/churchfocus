@@ -7,12 +7,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
+import logging
+
 import httpx
 
 from app.config import ROOT, get_settings
 
-# Pricing placeholders (USD per 1M tokens) for cost estimate in logs.
-_COST = {"fast": (0.15, 0.60), "strong": (2.50, 10.0)}
+log = logging.getLogger("app.llm")
+
+# USD per 1M tokens (input, output) for the cost column in calls.jsonl. Unknown models fall back by tier.
+# Note: with OpenAI data sharing on, usage inside the daily complimentary pool is actually free.
+_MODEL_COST = {"gpt-5.6-luna": (0.20, 1.20), "gpt-5.6-terra": (2.00, 12.00), "gpt-5.6-sol": (5.00, 30.00),
+               "gpt-6-sol": (2.00, 10.00), "gpt-6-luna": (0.10, 0.50), "gpt-5.4-mini": (0.75, 4.50), "gpt-5.4-nano": (0.20, 1.25)}
+_COST = {"fast": (0.20, 1.20), "strong": (2.00, 12.00)}
+_JSON_SYSTEM = ("Respond only with a single JSON object (no prose, no code fences) that matches this JSON schema:\n{schema}")
 
 
 def load_prompt(name: str) -> str:
@@ -60,8 +68,8 @@ def _model_for(tier: Literal["fast", "strong"]) -> str:
     return s.openai_model_fast if tier == "fast" else s.openai_model_strong
 
 
-def _estimate_cost(tier: str, prompt_tokens: int, completion_tokens: int) -> float:
-    inp, out = _COST.get(tier, (0.0, 0.0))
+def _estimate_cost(tier: str, prompt_tokens: int, completion_tokens: int, model: str = "") -> float:
+    inp, out = _MODEL_COST.get(model) or _COST.get(tier, (0.0, 0.0))
     return (prompt_tokens * inp + completion_tokens * out) / 1_000_000
 
 
@@ -83,6 +91,15 @@ def _validate_schema(obj: dict, schema: dict) -> None:
             raise ValueError(f"{key!r} must be array")
         if expected == "object" and not isinstance(obj[key], dict):
             raise ValueError(f"{key!r} must be object")
+
+
+def _strip_fences(text: str) -> str:
+    t = (text or "").strip()
+    if t.startswith("```"):
+        t = t.split("\n", 1)[1] if "\n" in t else t[3:]
+        if t.rstrip().endswith("```"):
+            t = t.rstrip()[:-3]
+    return t.strip()
 
 
 def _openai_chat(model: str, messages: list[dict], **kw: Any) -> tuple[str, int, int]:
@@ -132,32 +149,33 @@ def complete_json(
     raw = ""
     fmt_kw: dict[str, Any] = {}
     if get_settings().llm_backend == "openai":
+        # json_object mode REQUIRES the word "JSON" in the messages (else HTTP 400); always add the schema note.
         fmt_kw["response_format"] = {"type": "json_object"}
+        messages = [{"role": "system", "content": _JSON_SYSTEM.format(schema=json.dumps(schema))}] + list(messages)
     else:
         fmt_kw["format"] = schema
     try:
-        raw, pt, ct = _chat(model, messages, **fmt_kw)
-        obj = json.loads(raw)
-        _validate_schema(obj, schema)
-        return obj
-    except (json.JSONDecodeError, ValueError, KeyError):
-        repair_msgs = messages + [
-            {"role": "assistant", "content": raw},
-            {
-                "role": "user",
-                "content": "Your JSON was invalid or incomplete. Return ONLY valid JSON matching the schema.",
-            },
-        ]
         try:
+            raw, pt, ct = _chat(model, messages, **fmt_kw)
+            obj = json.loads(_strip_fences(raw))
+            _validate_schema(obj, schema)
+            return obj
+        except (json.JSONDecodeError, ValueError, KeyError) as first_err:
+            log.warning("complete_json %s: invalid JSON (%s); repairing once", task, first_err)
+            repair_msgs = messages + [
+                {"role": "assistant", "content": raw},
+                {"role": "user", "content": f"That was not valid ({first_err}). Return ONLY a JSON object matching the schema."},
+            ]
             raw2, pt2, ct2 = _chat(model, repair_msgs, **fmt_kw)
             pt += pt2
             ct += ct2
-            obj = json.loads(raw2)
+            obj = json.loads(_strip_fences(raw2))
             _validate_schema(obj, schema)
             return obj
-        except Exception:
-            ok = False
-            raise
+    except Exception as e:
+        ok = False
+        log.warning("complete_json %s failed: %s: %s", task, type(e).__name__, e)
+        raise
     finally:
         ms = int((time.perf_counter() - t0) * 1000)
         _log_call(
@@ -166,7 +184,7 @@ def complete_json(
             ms=ms,
             prompt_tokens=pt,
             completion_tokens=ct,
-            cost_usd=_estimate_cost(tier, pt, ct),
+            cost_usd=_estimate_cost(tier, pt, ct, model),
             ok=ok,
         )
 
@@ -176,6 +194,7 @@ def chat_tools(
     messages: list[dict],
     tools: list[dict],
     tier: Literal["fast", "strong"] = "strong",
+    tool_choice: str | None = None,
 ) -> dict:
     model = _model_for(tier)
     t0 = time.perf_counter()
@@ -187,16 +206,24 @@ def chat_tools(
                 model,
                 messages + [{"role": "user", "content": f"Available tools: {json.dumps(tools)}"}],
             )
+            log.warning("chat_tools: Ollama backend does not support tool calling here; deep search needs LLM_BACKEND=openai")
             return {"role": "assistant", "content": raw, "tool_calls": []}
 
         from openai import OpenAI
 
         client = OpenAI(api_key=get_settings().openai_api_key)
-        resp = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            tools=tools,
-        )
+        extra: dict[str, Any] = {"tool_choice": tool_choice} if tool_choice else {}
+        for attempt in range(2):  # one retry on rate limit / server error
+            try:
+                resp = client.chat.completions.create(model=model, messages=messages, tools=tools, **extra)
+                break
+            except Exception as e:  # openai.RateLimitError / APIStatusError 5xx / connection errors
+                status = getattr(e, "status_code", None)
+                if attempt == 0 and (status is None or status == 429 or status >= 500):
+                    log.warning("chat_tools %s: %s; retrying in 5 s", task, e)
+                    time.sleep(5)
+                    continue
+                raise
         msg = resp.choices[0].message
         usage = resp.usage
         pt = usage.prompt_tokens if usage else 0
@@ -226,7 +253,7 @@ def chat_tools(
             ms=ms,
             prompt_tokens=pt,
             completion_tokens=ct,
-            cost_usd=_estimate_cost(tier, pt, ct),
+            cost_usd=_estimate_cost(tier, pt, ct, model),
             ok=ok,
         )
 
@@ -251,6 +278,8 @@ def transcribe(audio_path: str) -> str:
 
 
 def web_search(query: str, max_results: int = 8) -> list[dict]:
+    """OpenAI Responses API web search. Returns [{title, url, snippet}] from url_citation annotations.
+    Billed per call (~$0.01), not covered by complimentary tokens."""
     model = get_settings().openai_model_fast
     t0 = time.perf_counter()
     ok = True
@@ -259,24 +288,43 @@ def web_search(query: str, max_results: int = 8) -> list[dict]:
         from openai import OpenAI
 
         client = OpenAI(api_key=get_settings().openai_api_key)
-        resp = client.responses.create(
-            model=model,
-            tools=[{"type": "web_search_preview"}],
-            input=query,
-        )
+        resp = None
+        for tool_type in ("web_search", "web_search_preview"):
+            try:
+                resp = client.responses.create(model=model, tools=[{"type": tool_type}], input=query)
+                break
+            except Exception as e:  # older accounts/models only know the preview tool name
+                last = e
+                continue
+        if resp is None:
+            raise last  # noqa: F821
+        usage = getattr(resp, "usage", None)
+        pt = getattr(usage, "input_tokens", 0) or 0
+        ct = getattr(usage, "output_tokens", 0) or 0
         results: list[dict] = []
+        seen: set[str] = set()
         for item in getattr(resp, "output", []) or []:
             for part in getattr(item, "content", []) or []:
-                if getattr(part, "type", "") == "output_text":
-                    text = part.text
-                    for line in text.splitlines():
-                        if line.strip():
-                            results.append({"title": line[:80], "url": "", "snippet": line})
+                if getattr(part, "type", "") != "output_text":
+                    continue
+                text = getattr(part, "text", "") or ""
+                for a in getattr(part, "annotations", []) or []:
+                    if getattr(a, "type", "") != "url_citation":
+                        continue
+                    url = getattr(a, "url", "") or ""
+                    if not url or url in seen:
+                        continue
+                    seen.add(url)
+                    start = max(0, (getattr(a, "start_index", 0) or 0) - 200)
+                    end = getattr(a, "end_index", None) or (start + 200)
+                    results.append({"title": getattr(a, "title", "") or url, "url": url,
+                                    "snippet": text[start:end].strip()[:300]})
         return results[:max_results]
-    except Exception:
+    except Exception as e:
         ok = False
-        # Fallback for tests / missing API support: empty list
+        log.warning("web_search failed for %r: %s: %s", query, type(e).__name__, e)
         return []
     finally:
         ms = int((time.perf_counter() - t0) * 1000)
-        _log_call(task="web_search", model=model, ms=ms, prompt_tokens=pt, completion_tokens=ct, cost_usd=0.0, ok=ok)
+        _log_call(task="web_search", model=model, ms=ms, prompt_tokens=pt, completion_tokens=ct,
+                  cost_usd=_estimate_cost("fast", pt, ct, model) + 0.01, ok=ok)

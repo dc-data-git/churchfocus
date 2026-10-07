@@ -11,6 +11,7 @@ from app.llm import complete_json, load_prompt
 from app.features import all_features, feature, settled_open
 from app.match import score
 from app.models import Church, Evidence, PreferenceProfile
+from app.evidence_rules import marriage_rule_violation, value_ok
 from app.stage2.website import site_pages
 
 _VERBATIM_THRESHOLD = 90
@@ -74,16 +75,13 @@ def _source_for_kind(kind: str) -> str:
 
 
 def _apply_marriage_rule(items: list[dict]) -> list[dict]:
-    """Marriage statements settle lgbtq.marriage only — never lgbtq.inclusion."""
+    """Marriage statements settle lgbtq.marriage only — never lgbtq.inclusion (shared rule, R10).
+    Affirming statements are kept (the old filter dropped anything that wasn't 'man and woman')."""
     out: list[dict] = []
     for item in items:
-        fid = item.get("feature", "")
-        if fid == "lgbtq.inclusion":
+        if item.get("status") == "stated" and marriage_rule_violation(
+                item.get("feature", ""), item.get("value", ""), item.get("quote", "")):
             continue
-        if fid == "lgbtq.marriage" and item.get("status") == "stated":
-            quote = item.get("quote", "")
-            if quote and not _MARRIAGE_RE.search(quote):
-                continue
         out.append(item)
     return out
 
@@ -92,12 +90,13 @@ def _extract_page(page: dict, feature_ids: list[str]) -> list[dict]:
     if not page.get("text") or not feature_ids:
         return []
     prompt = load_prompt("page_extract.v1")
-    labels = {fid: feature(fid)["label"] for fid in feature_ids}
+    # The model must know the allowed values, or nearly every value it writes is rejected below.
+    lines = [f"- {fid}: {feature(fid)['label']}; allowed values: {feature(fid)['values']}" for fid in feature_ids]
     user = (
         f"Page URL: {page['url']}\n"
         f"Page kind: {page['kind']}\n\n"
-        f"Requested features:\n"
-        + "\n".join(f"- {fid}: {labels[fid]}" for fid in feature_ids)
+        f"Requested features (use ONLY the allowed values):\n"
+        + "\n".join(lines)
         + f"\n\nPage text:\n{page['text'][:15000]}"
     )
     result = complete_json(
@@ -119,8 +118,7 @@ def _to_evidence(item: dict, page: dict, page_text: str) -> Evidence | None:
     if fid not in all_features():
         return None
     value = item.get("value", "")
-    allowed = feature(fid)["values"]
-    if value not in allowed:
+    if not value_ok(fid, value) or marriage_rule_violation(fid, value, quote):
         return None
     return Evidence(
         feature=fid,
@@ -154,8 +152,11 @@ def _deep_dive_rating(pages: list[dict], open_features: list[str], profile: Pref
 
 def medium_search(church: Church, profile: PreferenceProfile) -> dict:
     """Run Stage 2 on one church; return card dict with deep_dive_candidate."""
+    from app.denom.kb import get_kb
+
+    kb = get_kb()
     if not church.website:
-        match = score(church, profile)
+        match = score(church, profile, kb)
         feature_ids = [p.feature for p in profile.preferences]
         settled, open_f = settled_open(church.evidence, feature_ids)
         rating, reason = "weak", "No website on file"
@@ -175,7 +176,10 @@ def medium_search(church: Church, profile: PreferenceProfile) -> dict:
     new_evidence: list[Evidence] = []
 
     for page in pages:
-        raw = _extract_page(page, stage2_ids)
+        try:
+            raw = _extract_page(page, stage2_ids)
+        except Exception:   # one bad page / model error must not lose the whole card (R12)
+            continue
         raw = _apply_marriage_rule(raw)
         for item in raw:
             ev = _to_evidence(item, page, page["text"])
@@ -188,7 +192,7 @@ def medium_search(church: Church, profile: PreferenceProfile) -> dict:
 
     all_evidence = church.evidence + new_evidence
     updated = church.model_copy(update={"evidence": all_evidence, "stage_done": max(church.stage_done, 2)})
-    match = score(updated, profile)
+    match = score(updated, profile, kb)   # keep denominational priors in the Stage 2 score
     feature_ids = [p.feature for p in profile.preferences]
     settled, open_f = settled_open(all_evidence, feature_ids)
     rating, reason = _deep_dive_rating(pages, open_f, profile)

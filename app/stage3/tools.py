@@ -17,9 +17,12 @@ from app.llm import web_search as llm_web_search
 from app.models import Church, Evidence, StepLog
 from app.stage1 import denomination as denom_module
 from app.stage3 import sermons
+from app.evidence_rules import marriage_rule_violation, value_ok
 from app.web import Blocked, fetch
 
 _VERBATIM_THRESHOLD = 90
+MODEL_TEXT_CHARS = 4000     # R6: what the model sees per page; full text stays in ctx for quote checks
+MODEL_LINKS = 30
 
 
 def _norm(text: str) -> str:
@@ -55,6 +58,9 @@ def make_ctx(
         "finished": False,
         "finish_summary": "",
         "sermons_analysed": 0,
+        "sermon_items": {},      # sermon_id -> item from get_sermons
+        "transcripts": {},       # sermon_id -> {text, minutes, speaker, title, ...}
+        "sermon_evidence": [],   # Evidence produced by analyse_sermons (the only source of tier D)
         "tool_calls": 0,
         "started_at": time.monotonic(),
     }
@@ -128,9 +134,17 @@ def _validate_evidence_items(items: list) -> tuple[list[Evidence], list[str]]:
         if ev.feature not in all_features():
             errors.append(f"unknown feature {ev.feature!r}")
             continue
-        allowed = feature(ev.feature)["values"]
-        if ev.value not in allowed:
-            errors.append(f"invalid value {ev.value!r} for {ev.feature}")
+        if not value_ok(ev.feature, ev.value):   # R10: unstated/unknown are always allowed
+            errors.append(f"invalid value {ev.value!r} for {ev.feature}; allowed: {feature(ev.feature)['values']} or unstated")
+            continue
+        if ev.tier in ("D", "prior"):            # R10: D only from analyse_sermons; priors come from the KB, not the agent
+            errors.append(f"{ev.feature}: tier {ev.tier} cannot be recorded directly (sermon observations are recorded by analyse_sermons)")
+            continue
+        if not ev.url:
+            errors.append(f"{ev.feature}: url required for tier {ev.tier}")
+            continue
+        if not ev.quote and ev.value not in ("unstated", "unknown"):
+            errors.append(f"{ev.feature}: quote required")
             continue
         accepted.append(ev)
     return accepted, errors
@@ -152,11 +166,20 @@ def fetch_page(ctx: dict[str, Any], url: str) -> dict:
             result_summary=f"status={page.get('status')} chars={len(page.get('text', ''))}",
             ms=ms,
         )
-        return page
+        return _for_model(page)
     except Blocked as exc:
         ms = int((time.perf_counter() - t0) * 1000)
         _log_tool(ctx, action="fetch_page", why=why, input={"url": url}, result_summary=f"blocked: {exc}", ms=ms)
         return {"url": url, "status": 0, "text": "", "links": [], "error": str(exc)}
+
+
+def _for_model(page: dict) -> dict:
+    """R6: keep the conversation small — the model sees a trimmed page; ctx keeps the full text."""
+    text = page.get("text") or ""
+    out = {k: page.get(k) for k in ("url", "status", "error") if page.get(k) is not None}
+    out["text"] = text[:MODEL_TEXT_CHARS] + (f"\n…[truncated; {len(text)} chars total]" if len(text) > MODEL_TEXT_CHARS else "")
+    out["links"] = [{"href": l.get("href"), "text": (l.get("text") or "")[:60]} for l in (page.get("links") or [])[:MODEL_LINKS]]
+    return out
 
 
 def search_web(ctx: dict[str, Any], query: str) -> dict:
@@ -192,7 +215,7 @@ def wayback_snapshots(ctx: dict[str, Any], url: str, years: list[int]) -> dict:
                 resp = client.get(cdx_url)
                 if resp.status_code == 200:
                     rows = resp.json()
-                    for row in rows[1:]:
+                    for row in rows[1:41]:   # cap: enough to see tenure / statement changes
                         if len(row) >= 2:
                             ts, snap_url = row[1], row[2] if len(row) > 2 else url
                             snapshots.append(
@@ -264,77 +287,126 @@ def denomination_locator_search(ctx: dict[str, Any], church_name: str, city: str
     return out
 
 
-def find_sermon_feeds(ctx: dict[str, Any], church: Church | dict[str, Any]) -> dict:
+def find_sermon_feeds(ctx: dict[str, Any]) -> dict:
+    """Sermon/media feeds for THIS church (ctx church; the model never supplies the church — R6)."""
     t0 = time.perf_counter()
     why = ctx.pop("_tool_why", "")
-    if isinstance(church, dict):
-        church = Church.model_validate(church)
-    result = sermons.find_sermon_feeds(church)
-    ms = int((time.perf_counter() - t0) * 1000)
-    _log_tool(
-        ctx,
-        action="find_sermon_feeds",
-        why=why,
-        input={"church_id": church.church_id},
-        result_summary=f"{len(result.get('feeds', []))} feeds",
-        ms=ms,
-    )
-    return result
+    church = ctx.get("church")
+    if church is None or not church.website:
+        result = {"feeds": [], "note": "no website on file"}
+    else:
+        result = sermons.find_sermon_feeds(church)
+    feeds = result.get("feeds", [])[:15]
+    _log_tool(ctx, action="find_sermon_feeds", why=why, input={"church_id": ctx.get("church_id")},
+              result_summary=f"{len(feeds)} feeds", ms=int((time.perf_counter() - t0) * 1000))
+    return {"feeds": feeds}
 
 
-def get_sermons(ctx: dict[str, Any], feed_url: str, limit: int) -> dict:
+def get_sermons(ctx: dict[str, Any], feed_url: str, limit: int = 25) -> dict:
+    """Parse a feed; items are stored in ctx and returned to the model as sermon_ids (no copying of data)."""
     t0 = time.perf_counter()
     why = ctx.pop("_tool_why", "")
     result = sermons.get_sermons(feed_url, limit)
-    ms = int((time.perf_counter() - t0) * 1000)
-    _log_tool(
-        ctx,
-        action="get_sermons",
-        why=why,
-        input={"feed_url": feed_url, "limit": limit},
-        result_summary=f"{len(result.get('items', []))} items",
-        ms=ms,
-    )
-    return result
+    items = result.get("items", [])
+    store = ctx.setdefault("sermon_items", {})
+    listing = []
+    for it in items:
+        sid = f"s{len(store) + 1}"
+        store[sid] = it
+        listing.append({"sermon_id": sid, "title": it.get("title", "")[:100], "date": it.get("date", "")[:10],
+                        "speaker": it.get("speaker", ""), "has_audio": bool(it.get("audio_url")),
+                        "has_transcript": bool(it.get("transcript_url") or it.get("text"))})
+    _log_tool(ctx, action="get_sermons", why=why, input={"feed_url": feed_url, "limit": limit},
+              result_summary=f"{len(items)} items" + (f" ({result['error']})" if result.get("error") else ""),
+              ms=int((time.perf_counter() - t0) * 1000))
+    return {"feed_url": feed_url, "sermons": listing, **({"error": result["error"]} if result.get("error") else {})}
 
 
-def transcribe_sermon(ctx: dict[str, Any], item: dict) -> dict:
+def transcribe_sermons(ctx: dict[str, Any], sermon_ids: list[str]) -> dict:
+    """Transcribe up to 3 in parallel; enforces DEEP_MAX_SERMONS across the whole job (R6). Transcripts stay in ctx."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from app.config import get_settings
+
     t0 = time.perf_counter()
     why = ctx.pop("_tool_why", "")
-    result = sermons.transcribe_sermon(item, church_id=ctx.get("church_id"))
-    text = result.get("text", "")
-    if text:
-        url = item.get("page_url") or item.get("title") or "sermon"
-        _track_fetched(ctx, url, text)
-    ms = int((time.perf_counter() - t0) * 1000)
-    _log_tool(
-        ctx,
-        action="transcribe_sermon",
-        why=why,
-        input={"title": item.get("title", "")},
-        result_summary=f"minutes={result.get('minutes', 0)} source={result.get('source', '')}",
-        ms=ms,
-    )
-    return result
+    store, done = ctx.setdefault("sermon_items", {}), ctx.setdefault("transcripts", {})
+    room = max(0, get_settings().deep_max_sermons - len(done))
+    todo = [sid for sid in dict.fromkeys(sermon_ids) if sid in store and sid not in done][:room]
+    skipped = [sid for sid in sermon_ids if sid not in todo and sid not in done]
+
+    def work(sid: str) -> tuple[str, dict]:
+        try:
+            return sid, sermons.transcribe_sermon(store[sid], church_id=ctx.get("church_id"))
+        except Exception as e:   # one bad download must not kill the batch
+            return sid, {"text": "", "minutes": 0.0, "source": "error", "error": f"{type(e).__name__}: {e}"[:200]}
+
+    results = []
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        for sid, r in pool.map(work, todo):
+            item = store[sid]
+            if r.get("text"):
+                done[sid] = {**r, "title": item.get("title", ""), "date": item.get("date", ""),
+                             "speaker": r.get("speaker") or item.get("speaker", ""), "page_url": item.get("page_url", "")}
+                _track_fetched(ctx, item.get("page_url") or f"sermon:{sid}", r["text"])
+            results.append({"sermon_id": sid, "minutes": round(float(r.get("minutes") or 0), 1),
+                            "chars": len(r.get("text") or ""), "source": r.get("source"), **({"error": r["error"]} if r.get("error") else {})})
+    note = f"budget: {len(done)} of {get_settings().deep_max_sermons} sermons transcribed"
+    if skipped:
+        note += f"; skipped {len(skipped)} (unknown id, already done, or over budget)"
+    _log_tool(ctx, action="transcribe_sermons", why=why, input={"sermon_ids": sermon_ids},
+              result_summary=f"{sum(1 for r in results if r['chars'])} transcribed; {note}",
+              ms=int((time.perf_counter() - t0) * 1000))
+    return {"results": results, "note": note}
 
 
-def analyse_sermons(ctx: dict[str, Any], texts: list[dict], features: list[str]) -> dict:
+def transcribe_sermon(ctx: dict[str, Any], sermon_id: str) -> dict:
+    """Single-sermon convenience wrapper (INTERFACES name)."""
+    return transcribe_sermons(ctx, [sermon_id])
+
+
+_SERMON_FEATURES = {"women.preach", "logistics.sermon_length", "preaching.style", "preaching.audience",
+                    "preaching.scripture_density", "preaching.politics_frequency"}
+
+
+def analyse_sermons(ctx: dict[str, Any], sermon_ids: list[str] | None = None, features: list[str] | None = None) -> dict:
+    """Analyse transcribed sermons and RECORD the observed evidence (tier D) plus verbatim stated positions (tier A)."""
     t0 = time.perf_counter()
     why = ctx.pop("_tool_why", "")
-    result = sermons.analyse_sermons(texts, features, church_id=ctx.get("church_id"))
-    ctx["sermons_analysed"] = int(ctx.get("sermons_analysed", 0)) + int(result.get("sermons_analysed", 0))
-    moved = [e.feature for e in result.get("evidence", [])]
-    ms = int((time.perf_counter() - t0) * 1000)
-    _log_tool(
-        ctx,
-        action="analyse_sermons",
-        why=why,
-        input={"sermon_count": len(texts), "features": features},
-        result_summary=f"{result.get('sermons_analysed', 0)} analysed, {len(moved)} features",
-        features_moved=moved,
-        ms=ms,
-    )
-    return {"evidence": [e.model_dump(mode="json") for e in result.get("evidence", [])], **result}
+    done = ctx.get("transcripts", {})
+    ids = [sid for sid in (sermon_ids or list(done)) if sid in done]
+    analysed = set(ctx.setdefault("analysed_ids", []))
+    feats = [f for f in (features or list(_SERMON_FEATURES)) if f in all_features()] or list(_SERMON_FEATURES)
+    texts = [{**done[sid], "sermon_id": sid} for sid in ids]
+    result = sermons.analyse_sermons(texts, list(set(feats) | _SERMON_FEATURES), church_id=ctx.get("church_id"))
+    ctx["analysed_ids"] = sorted(analysed | set(ids))
+    ctx["sermons_analysed"] = len(ctx["analysed_ids"])
+
+    observed: list[Evidence] = list(result.get("evidence", []))
+    stated: list[Evidence] = []
+    for sid, a in zip(ids, result.get("analyses", [])):
+        src = done[sid]
+        for pos in a.get("stated_positions") or []:
+            if not isinstance(pos, dict):
+                continue
+            fid, val, quote = pos.get("feature", ""), str(pos.get("value", "")), str(pos.get("quote", ""))
+            if (value_ok(fid, val) and quote_verbatim(quote, src["text"]) and not marriage_rule_violation(fid, val, quote)):
+                stated.append(Evidence(feature=fid, value=val, tier="A", how="stated", source_kind="sermon_transcript",
+                                       quote=quote[:300], url=src.get("page_url") or "", note=f"sermon: {src.get('title', '')[:80]}"))
+    new = observed + [e for e in stated if e.url]
+    if new:
+        db.add_evidence(ctx["church_id"], new)
+        ctx.setdefault("sermon_evidence", []).extend(observed)
+        church = ctx.get("church")
+        if church is not None:
+            ctx["church"] = church.model_copy(update={"evidence": church.evidence + new})
+    settled, open_f = settled_open(db.get_evidence(ctx["church_id"]), _profile_feature_ids(ctx))
+    moved = sorted({e.feature for e in new})
+    _log_tool(ctx, action="analyse_sermons", why=why, input={"sermon_ids": ids, "features": feats},
+              result_summary=f"{len(ids)} analysed; recorded {len(new)} evidence ({', '.join(moved)})",
+              features_moved=moved, ms=int((time.perf_counter() - t0) * 1000))
+    return {"analysed": len(ids), "recorded": [{"feature": e.feature, "value": e.value, "tier": e.tier, "note": e.note} for e in new],
+            "settled": settled, "open": open_f}
 
 
 def record_evidence(ctx: dict[str, Any], evidence: list) -> dict:
@@ -374,6 +446,10 @@ def record_evidence(ctx: dict[str, Any], evidence: list) -> dict:
                     )
                 )
                 continue
+        why_not = marriage_rule_violation(ev.feature, ev.value, ev.quote)   # after the verbatim check (R10)
+        if why_not:
+            quote_errors.append(f"{ev.feature}: {why_not}")
+            continue
         stored.append(ev)
 
     if quote_errors and not stored:

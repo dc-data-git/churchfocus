@@ -61,5 +61,5 @@ def get_settings() -> Settings:
         deep_max_tool_calls=int(e("DEEP_MAX_TOOL_CALLS", "150")),
         deep_max_sermons=int(e("DEEP_MAX_SERMONS", "25")),
         cache_max_age_days=int(e("CACHE_MAX_AGE_DAYS", "30")),
-        user_agent=e("USER_AGENT", "ChurchSearch/0.1"),
+        user_agent=e("USER_AGENT", "ChurchSearch/0.1 (hackathon research tool)"),
     )

@@ -17,175 +17,50 @@ from app.stage3 import tools
 
 _executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="deep-search")
 
+def _fn(name: str, desc: str, props: dict, required: list[str]) -> dict:
+    props = {**props, "why": {"type": "string", "description": "One sentence: which feature(s) this should move and why."}}
+    return {"type": "function", "function": {"name": name, "description": desc, "parameters": {
+        "type": "object", "properties": props, "required": required + ["why"]}}}
+
+
+_EVIDENCE_ITEM = {
+    "type": "object",
+    "properties": {
+        "feature": {"type": "string", "description": "A feature id from the list you were given."},
+        "value": {"type": "string", "description": "An allowed value for that feature, or 'unstated' if the church's pages do not say."},
+        "tier": {"type": "string", "enum": ["A", "B", "C"], "description": "A = church's own words; B = independent source; C = weak third-party signal."},
+        "quote": {"type": "string", "description": "Copied word-for-word from a page you fetched (<= 60 words)."},
+        "url": {"type": "string", "description": "The page the quote came from."},
+        "source_kind": {"type": "string"},
+        "how": {"type": "string", "enum": ["stated", "inferred"]},
+        "note": {"type": "string"},
+    },
+    "required": ["feature", "value", "tier", "quote", "url", "source_kind", "how"],
+}
+
 _TOOL_SCHEMAS: list[dict[str, Any]] = [
-    {
-        "type": "function",
-        "function": {
-            "name": "fetch_page",
-            "description": "Fetch a public church page",
-            "parameters": {
-                "type": "object",
-                "required": ["url", "why"],
-                "properties": {"url": {"type": "string"}, "why": {"type": "string"}},
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "search_web",
-            "description": "Search the public web",
-            "parameters": {
-                "type": "object",
-                "required": ["query", "why"],
-                "properties": {"query": {"type": "string"}, "why": {"type": "string"}},
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "wayback_snapshots",
-            "description": "List Wayback Machine snapshots for a URL",
-            "parameters": {
-                "type": "object",
-                "required": ["url", "years", "why"],
-                "properties": {
-                    "url": {"type": "string"},
-                    "years": {"type": "array", "items": {"type": "integer"}},
-                    "why": {"type": "string"},
-                },
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "denomination_lookup",
-            "description": "Look up a denomination in the KB",
-            "parameters": {
-                "type": "object",
-                "required": ["name_or_id", "why"],
-                "properties": {"name_or_id": {"type": "string"}, "why": {"type": "string"}},
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "denomination_locator_search",
-            "description": "Search official denomination locators",
-            "parameters": {
-                "type": "object",
-                "required": ["church_name", "city", "why"],
-                "properties": {
-                    "church_name": {"type": "string"},
-                    "city": {"type": "string"},
-                    "why": {"type": "string"},
-                },
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "find_sermon_feeds",
-            "description": "Find sermon/media feeds on the church website",
-            "parameters": {
-                "type": "object",
-                "required": ["church", "why"],
-                "properties": {"church": {"type": "object"}, "why": {"type": "string"}},
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_sermons",
-            "description": "List sermons from a feed",
-            "parameters": {
-                "type": "object",
-                "required": ["feed_url", "limit", "why"],
-                "properties": {
-                    "feed_url": {"type": "string"},
-                    "limit": {"type": "integer"},
-                    "why": {"type": "string"},
-                },
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "transcribe_sermon",
-            "description": "Transcribe one sermon item",
-            "parameters": {
-                "type": "object",
-                "required": ["item", "why"],
-                "properties": {"item": {"type": "object"}, "why": {"type": "string"}},
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "analyse_sermons",
-            "description": "Analyse sermon transcripts for observed features",
-            "parameters": {
-                "type": "object",
-                "required": ["texts", "features", "why"],
-                "properties": {
-                    "texts": {"type": "array", "items": {"type": "object"}},
-                    "features": {"type": "array", "items": {"type": "string"}},
-                    "why": {"type": "string"},
-                },
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "record_evidence",
-            "description": "Store verified evidence for this church",
-            "parameters": {
-                "type": "object",
-                "required": ["evidence", "why"],
-                "properties": {
-                    "evidence": {"type": "array", "items": {"type": "object"}},
-                    "why": {"type": "string"},
-                },
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "escalate",
-            "description": "Flag a concern for the user",
-            "parameters": {
-                "type": "object",
-                "required": ["reason", "message", "questions", "why"],
-                "properties": {
-                    "reason": {"type": "string"},
-                    "message": {"type": "string"},
-                    "questions": {"type": "array", "items": {"type": "string"}},
-                    "why": {"type": "string"},
-                },
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "finish",
-            "description": "Stop research with a short summary",
-            "parameters": {
-                "type": "object",
-                "required": ["summary", "why"],
-                "properties": {"summary": {"type": "string"}, "why": {"type": "string"}},
-            },
-        },
-    },
+    _fn("fetch_page", "Fetch a public page (text trimmed to ~4,000 chars + up to 30 links).", {"url": {"type": "string"}}, ["url"]),
+    _fn("search_web", "Search the public web; returns titles, URLs and snippets.", {"query": {"type": "string"}}, ["query"]),
+    _fn("wayback_snapshots", "List archived snapshots of a URL (leadership tenure, changed statements).",
+        {"url": {"type": "string"}, "years": {"type": "array", "items": {"type": "integer"}}}, ["url", "years"]),
+    _fn("denomination_lookup", "What a denomination typically holds (a prior, never a fact about this church).",
+        {"name_or_id": {"type": "string"}}, ["name_or_id"]),
+    _fn("find_sermon_feeds", "Find sermon podcast/RSS/media feeds on THIS church's website.", {}, []),
+    _fn("get_sermons", "List sermons from a feed, newest first. Returns sermon_ids.",
+        {"feed_url": {"type": "string"}, "limit": {"type": "integer"}}, ["feed_url"]),
+    _fn("transcribe_sermons", "Transcribe sermons by sermon_id (3 in parallel; total capped per church).",
+        {"sermon_ids": {"type": "array", "items": {"type": "string"}}}, ["sermon_ids"]),
+    _fn("analyse_sermons", "Analyse transcribed sermons and RECORD what they show (who preaches, length, style, "
+        "audience, politics). Omit sermon_ids to analyse all transcribed sermons.",
+        {"sermon_ids": {"type": "array", "items": {"type": "string"}}, "features": {"type": "array", "items": {"type": "string"}}}, []),
+    _fn("record_evidence", "Store evidence from pages you fetched. Quotes are re-checked word-for-word against the page.",
+        {"evidence": {"type": "array", "items": _EVIDENCE_ITEM}}, ["evidence"]),
+    _fn("escalate", "Hand a question back to the person (conflicting evidence on a must-have, unclear denomination).",
+        {"reason": {"type": "string", "enum": ["dealbreaker_conflict", "low_denom_confidence", "budget_exhausted"]},
+         "message": {"type": "string"}, "questions": {"type": "array", "items": {"type": "string"}}},
+        ["reason", "message", "questions"]),
+    _fn("finish", "Stop: all must-have/important features settled or not findable. Summarise in <= 5 sentences.",
+        {"summary": {"type": "string"}}, ["summary"]),
 ]
 
 _TOOL_DISPATCH: dict[str, Callable[..., dict]] = {
@@ -196,6 +71,7 @@ _TOOL_DISPATCH: dict[str, Callable[..., dict]] = {
     "denomination_locator_search": tools.denomination_locator_search,
     "find_sermon_feeds": tools.find_sermon_feeds,
     "get_sermons": tools.get_sermons,
+    "transcribe_sermons": tools.transcribe_sermons,
     "transcribe_sermon": tools.transcribe_sermon,
     "analyse_sermons": tools.analyse_sermons,
     "record_evidence": tools.record_evidence,
@@ -213,7 +89,7 @@ def _target_features(profile: PreferenceProfile) -> list[str]:
 
 
 def _important_settled(profile: PreferenceProfile, evidence) -> bool:
-    feature_ids = _priority_features(profile)
+    feature_ids = _priority_features(profile) or _target_features(profile)   # no must-haves -> research nice-to-haves
     if not feature_ids:
         return True
     settled, _ = settled_open(evidence, feature_ids)
@@ -244,9 +120,15 @@ def _state_message(church: Church, profile: PreferenceProfile, ctx: dict[str, An
     settled, open_f = settled_open(evidence, feature_ids)
     priority = _priority_features(profile)
     priority_open = [f for f in open_f if f in priority]
-    return json.dumps(
+    from app.features import feature as _feature
+
+    return "CURRENT STATE (replaces any earlier state):\n" + json.dumps(
         {
-            "church": church.model_dump(mode="json"),
+            "church": {"name": church.name, "address": church.address, "website": church.website,
+                       "denomination": church.denomination.label, "denomination_confidence": church.denomination.confidence},
+            "features_to_research": {f: {"label": _feature(f)["label"], "allowed_values": _feature(f)["values"],
+                                         "weight": next((p.weight for p in profile.preferences if p.feature == f), "")}
+                                     for f in open_f},
             "profile_session": profile.session_id,
             "settled": settled,
             "open": open_f,
@@ -265,9 +147,16 @@ def _execute_tool(ctx: dict[str, Any], name: str, arguments: dict[str, Any]) -> 
     args = dict(arguments)
     why = args.pop("why", "")
     ctx["_tool_why"] = why
-    if name == "find_sermon_feeds" and "church" not in args and ctx.get("church") is not None:
-        args["church"] = ctx["church"]
-    return fn(ctx, **args)
+    args.pop("church", None)   # never trust a model-supplied church object (R6)
+    try:
+        return fn(ctx, **args)
+    except TypeError as e:     # missing/extra arguments from the model
+        return {"error": f"bad arguments for {name}: {e}"}
+    except Exception as e:     # R6: a failing tool returns an error to the model; it never kills the job
+        import logging
+
+        logging.getLogger("app.agent").warning("tool %s failed: %s", name, e, exc_info=True)
+        return {"error": f"{type(e).__name__}: {str(e)[:300]}"}
 
 
 def _open_dealbreakers(profile: PreferenceProfile, evidence) -> list[str]:
@@ -276,8 +165,24 @@ def _open_dealbreakers(profile: PreferenceProfile, evidence) -> list[str]:
     return [f for f in open_f if f in dealbreakers]
 
 
+def _compact(messages: list[dict]) -> list[dict]:
+    """R6: bound the context. Keep system + latest state; shrink tool results older than the last 2 turns."""
+    state_idx = [i for i, m in enumerate(messages) if m.get("role") == "user" and str(m.get("content", "")).startswith("CURRENT STATE")]
+    drop = set(state_idx[:-1])
+    assistant_idx = [i for i, m in enumerate(messages) if m.get("role") == "assistant"]
+    cutoff = assistant_idx[-2] if len(assistant_idx) >= 2 else 0
+    out = []
+    for i, m in enumerate(messages):
+        if i in drop:
+            continue
+        if m.get("role") == "tool" and i < cutoff and len(m.get("content") or "") > 600:
+            m = {**m, "content": m["content"][:600] + "…[older result trimmed]"}
+        out.append(m)
+    return out
+
+
 def deep_search(church: Church, profile: PreferenceProfile, job_id: str):
-    """Run the deep-search agent loop synchronously (tests and inline runs)."""
+    """Run the deep-search agent loop. Never leaves the job 'running': errors end as status=error with a partial report."""
     try:
         db.get_job(job_id)
     except KeyError:
@@ -291,15 +196,40 @@ def deep_search(church: Church, profile: PreferenceProfile, job_id: str):
         profile=profile,
         church=church,
     )
+    status = "complete"
+    try:
+        _loop(church, profile, job_id, ctx)
+    except Exception as e:  # R6: model/API failure -> partial report, job marked error
+        import logging
+
+        logging.getLogger("app.agent").exception("deep search %s failed", job_id)
+        status = "error"
+        tools.escalate(ctx, reason="budget_exhausted", message=f"Research stopped early because of an error ({type(e).__name__}). "
+                       "What we found so far is below.", questions=[])
+
+    all_evidence = db.get_evidence(church.church_id)
+    updated_church = ctx.get("church") or church
+    updated_church = updated_church.model_copy(update={"evidence": all_evidence, "stage_done": max(church.stage_done, 3)})
+    try:
+        rep, narrative = report_module.build_report(updated_church, profile, ctx)
+        path = report_module.save_report(rep, job_id, narrative=narrative)
+    except Exception as e:
+        db.update_job(job_id, status="error", progress=100, finished_at=datetime.now(timezone.utc).isoformat())
+        raise RuntimeError(f"report failed: {e}") from e
+    db.update_job(job_id, status=status, progress=100, report_path=str(path),
+                  finished_at=datetime.now(timezone.utc).isoformat())
+    return rep
+
+
+def _loop(church: Church, profile: PreferenceProfile, job_id: str, ctx: dict[str, Any]) -> None:
     if church.evidence:
         db.add_evidence(church.church_id, church.evidence)
 
-    system = load_prompt("deep_search.v1")
-    messages: list[dict[str, str]] = [
-        {"role": "system", "content": system},
+    messages: list[dict[str, Any]] = [
+        {"role": "system", "content": load_prompt("deep_search.v2")},
         {"role": "user", "content": _state_message(church, profile, ctx)},
     ]
-
+    nudged = False
     while True:
         evidence = db.get_evidence(church.church_id)
         if ctx.get("finished") or _important_settled(profile, evidence):
@@ -307,64 +237,46 @@ def deep_search(church: Church, profile: PreferenceProfile, job_id: str):
         if _budget_exhausted(ctx):
             open_db = _open_dealbreakers(profile, evidence)
             if open_db:
+                from app.features import feature as _feature
+
                 tools.escalate(
                     ctx,
                     reason="budget_exhausted",
                     message="Research budget reached with must-have features still open.",
-                    questions=[f"What is your position on {fid}?" for fid in open_db[:4]],
+                    questions=[f"Ask the church: {_feature(fid)['label']}?" for fid in open_db[:4]],
                 )
             break
 
-        response = chat_tools("deep_search", messages, _TOOL_SCHEMAS, tier="strong")
+        response = chat_tools("deep_search", _compact(messages), _TOOL_SCHEMAS, tier="strong", tool_choice="required")
         tool_calls = response.get("tool_calls") or []
         if not tool_calls:
-            break
+            if nudged:
+                break
+            nudged = True   # one plain-text reply: nudge once, then stop
+            messages.append({"role": "assistant", "content": response.get("content") or ""})
+            messages.append({"role": "user", "content": "Use a tool, or call finish if you are done."})
+            continue
 
         messages.append({"role": "assistant", "content": response.get("content") or "", "tool_calls": tool_calls})
-        for tc in tool_calls:
+        for tc in tool_calls:   # R6: every tool_call gets its tool message, in order, with nothing in between
             fn = tc.get("function", {})
             name = fn.get("name", "")
             raw_args = fn.get("arguments") or "{}"
             try:
                 args = json.loads(raw_args) if isinstance(raw_args, str) else dict(raw_args)
             except json.JSONDecodeError:
-                args = {}
+                args = None
             ctx["tool_calls"] = int(ctx.get("tool_calls", 0)) + 1
-            result = _execute_tool(ctx, name, args)
-            messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": tc.get("id", name),
-                    "content": json.dumps(result, default=str),
-                }
-            )
-            if name == "record_evidence" and result.get("ok"):
-                messages.append(
-                    {
-                        "role": "user",
-                        "content": "Updated settled/open:\n" + json.dumps(
-                            {"settled": result.get("settled"), "open": result.get("open")}
-                        ),
-                    }
-                )
-            if ctx.get("finished"):
-                break
+            if args is None:
+                result = {"error": "arguments were not valid JSON; try again with smaller arguments"}
+            elif ctx.get("finished"):
+                result = {"skipped": "finish was already called"}
+            else:
+                result = _execute_tool(ctx, name, args)
+            messages.append({"role": "tool", "tool_call_id": tc.get("id", name), "content": json.dumps(result, default=str)})
 
         messages.append({"role": "user", "content": _state_message(ctx["church"], profile, ctx)})
-        db.update_job(job_id, progress=min(95.0, ctx.get("tool_calls", 0) * 2))
-
-    all_evidence = db.get_evidence(church.church_id)
-    updated_church = church.model_copy(update={"evidence": all_evidence, "stage_done": max(church.stage_done, 3)})
-    rep, narrative = report_module.build_report(updated_church, profile, ctx)
-    path = report_module.save_report(rep, job_id, narrative=narrative)
-    db.update_job(
-        job_id,
-        status="complete",
-        progress=100,
-        report_path=str(path),
-        finished_at=datetime.now(timezone.utc).isoformat(),
-    )
-    return rep
+        db.update_job(job_id, progress=min(95.0, ctx.get("tool_calls", 0) * 100.0 / max(1, get_settings().deep_max_tool_calls)))
 
 
 def run_deep_search_job(
@@ -376,6 +288,18 @@ def run_deep_search_job(
 ):
     """Start deep search in a thread or run synchronously (tests)."""
     if background:
-        _executor.submit(deep_search, church, profile, job_id)
+        def _run() -> None:
+            try:
+                deep_search(church, profile, job_id)
+            except Exception:   # last resort: never leave the job "running" (R6)
+                import logging
+
+                logging.getLogger("app.agent").exception("deep search job %s crashed", job_id)
+                try:
+                    db.update_job(job_id, status="error", finished_at=datetime.now(timezone.utc).isoformat())
+                except Exception:
+                    pass
+
+        _executor.submit(_run)
         return None
     return deep_search(church, profile, job_id)

@@ -63,6 +63,7 @@ def test_resolve_locator_hit(monkeypatch, kb):
         "snippet": "Hesston Mennonite Fellowship in Hesston, KS is a member congregation.",
     }]
     monkeypatch.setattr("app.llm.web_search", fake.web_search)
+    monkeypatch.setattr(denomination, "LOCATOR_ENABLED", True)   # off by default for the demo (R9)
     guess = denomination.resolve({
         "name": "Hesston Mennonite Fellowship",
         "address": "101 E Smith St, Hesston, KS",
@@ -82,7 +83,7 @@ def test_resolve_website_non_denom(monkeypatch):
     FakeWeb(pages).install(monkeypatch)
     fake = FakeLLM(responses={
         "denom_classify": {
-            "denomination_label": "Non-denominational",
+            "label": "Non-denominational", "kb_candidates": [], "independent": True,
             "confidence": 0.9,
             "quote": "independent non-denominational church",
         }
@@ -95,6 +96,28 @@ def test_resolve_website_non_denom(monkeypatch):
     })
     assert guess.label == "Non-denominational"
     assert guess.confidence >= 0.8
+
+
+def test_locator_disabled_by_default(monkeypatch):
+    calls = []
+    monkeypatch.setattr("app.llm.web_search", lambda q, max_results=8: calls.append(q) or [])
+    denomination.resolve({"name": "Hesston Mennonite Fellowship", "address": "Hesston, KS", "types": ["church"]})
+    assert calls == []
+
+
+def test_website_classify_uses_kb_ids_and_requires_verbatim_quote(monkeypatch):
+    pages = {"https://trinity.example.org": {"html": "<html><body><p>Trinity is a congregation of the Evangelical Lutheran Church in America (ELCA), gathered around Word and Sacrament.</p></body></html>"}}
+    FakeWeb(pages).install(monkeypatch)
+    good = FakeLLM(responses={"denom_classify": {"label": "ELCA", "kb_candidates": ["elca"], "independent": False, "confidence": 0.9,
+                                                 "quote": "a congregation of the Evangelical Lutheran Church in America (ELCA)"}})
+    monkeypatch.setattr("app.llm.complete_json", good.complete_json)
+    g = denomination.resolve({"name": "Trinity Church", "website": "https://trinity.example.org", "types": ["church"]})
+    assert g.denomination_id == "elca" and g.confidence >= 0.8 and g.evidence[0].tier == "A"
+    bad = FakeLLM(responses={"denom_classify": {"label": "ELCA", "kb_candidates": ["elca"], "independent": False, "confidence": 0.9,
+                                                "quote": "Trinity proudly belongs to the ELCA synod of Kansas"}})
+    monkeypatch.setattr("app.llm.complete_json", bad.complete_json)
+    g2 = denomination._website_classify("Trinity Church", "https://trinity.example.org", denomination.get_kb())
+    assert g2.confidence <= 0.6 and not g2.evidence     # invented quote -> not confident, no A-tier evidence
 
 
 def test_resolve_unknown_low_confidence():

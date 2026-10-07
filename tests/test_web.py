@@ -108,3 +108,22 @@ def test_robots_disallowed(data_dir, monkeypatch):
     monkeypatch.setattr(web, "_robots", {})
     with pytest.raises(Blocked):
         fetch("https://blocked.example/private/page")
+
+
+# ---- code review R8 ----
+@pytest.mark.parametrize("url", [
+    "https://church.org/giving", "https://church.org/online-giving", "https://church.org/give/",
+    "https://tithe.ly/give?c=123", "https://mychurch.churchcenter.com/people/forms/1", "https://pushpay.com/g/church",
+])
+def test_giving_and_people_pages_blocked(url):
+    with pytest.raises(Blocked):
+        fetch(url)
+
+
+def test_error_pages_not_cached(data_dir, monkeypatch):
+    from tests.fakes import FakeWeb
+    FakeWeb({"https://x.org/a": {"status": 403, "html": "<html><body>Access denied by Cloudflare</body></html>"}}).install(monkeypatch)
+    r = fetch("https://x.org/a")
+    assert r["status"] == 403 and r["text"] == ""
+    from app.db import cache_get
+    assert cache_get("https://x.org/a") is None

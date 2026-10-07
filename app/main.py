@@ -11,6 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 
 from app import db
 from app.models import Church
@@ -21,7 +22,26 @@ APP_DIR = Path(__file__).resolve().parent
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     db.init()
+    _check_settings()
     yield
+
+
+def _check_settings() -> None:
+    """Fail loudly at startup instead of silently skipping every model call (review finding)."""
+    import logging
+
+    from app.config import get_settings
+
+    s = get_settings()
+    missing = []
+    if s.llm_backend == "openai":
+        missing += [n for n, v in (("OPENAI_API_KEY", s.openai_api_key), ("OPENAI_MODEL_FAST", s.openai_model_fast),
+                                   ("OPENAI_MODEL_STRONG", s.openai_model_strong)) if not v]
+    if not s.google_places_api_key:
+        missing.append("GOOGLE_PLACES_API_KEY")
+    if missing:
+        logging.getLogger("app").error("Missing settings in .env: %s — those features will fail.", ", ".join(missing))
+        print(f"\n*** Church Search: missing in .env: {', '.join(missing)} ***\n")
 
 
 app = FastAPI(title="Church Search", lifespan=lifespan)
@@ -87,7 +107,7 @@ async def api_chat(request: Request):
         text = str(text) if text is not None else None
 
     iv = _get_interviewer(session_id)
-    turn = iv.next_turn(text)
+    turn = await run_in_threadpool(iv.next_turn, text)   # LLM calls: keep the event loop free (R5)
     payload = {
         "session_id": session_id,
         "say": turn.get("say"),
@@ -119,9 +139,11 @@ async def api_profile_confirm(request: Request):
         session_id = str(form["session_id"])
 
     iv = _get_interviewer(session_id)
+    if iv._phase == "escalated":  # noqa: SLF001 — a crisis-escalated session must not be pushed through to search (R11)
+        return JSONResponse({"error": "escalated", "message": "Please talk with a person first."}, status_code=409)
     if iv._phase not in ("readback", "done"):  # noqa: SLF001 — confirm endpoint may follow read-back in UI
         iv._phase = "readback"
-    turn = iv.next_turn("Yes, that's right")
+    turn = await run_in_threadpool(iv.next_turn, "Yes, that's right")
     profile = iv.profile()
     db.save_profile(profile)
     return JSONResponse(profile.model_dump(mode="json") | {"done": turn.get("done", True)})
@@ -139,8 +161,12 @@ async def api_search(request: Request):
         return JSONResponse({"error": "unknown session"}, status_code=404)
 
     from app.stage1.denomination import light_search
+    from app.stage1.places import GeocodeError
 
-    results = light_search(profile)
+    try:
+        results = await run_in_threadpool(light_search, profile)   # minutes of network work: off the event loop (R5)
+    except GeocodeError as e:
+        return JSONResponse({"error": "geocode", "message": str(e)}, status_code=400)
     _session_results[session_id] = results
     out = [
         {"church": church.model_dump(mode="json"), "match": match.model_dump(mode="json")}
@@ -216,12 +242,17 @@ async def api_medium(request: Request):
                 "reason": "coming",
             }
         else:
-            card = medium_search(church, profile)
+            try:
+                card = await run_in_threadpool(medium_search, church, profile)   # R5
+            except Exception as e:  # one unreachable site must not 500 the whole request
+                card = {"church": church, "match": match, "settled": [], "open": [], "evidence": [],
+                        "deep_dive_candidate": "weak", "reason": f"Couldn't read this church's website ({type(e).__name__})."}
         render_cards.append(card)
         cards.append(_serialize_card(card))
 
     accept = request.headers.get("accept", "")
-    if "text/html" in accept and "application/json" not in accept:
+    # HTMX sends Accept: */* — return HTML whenever the request comes from HTMX (R4)
+    if request.headers.get("hx-request") or ("text/html" in accept and "application/json" not in accept):
         return templates.TemplateResponse(
             request, "cards.html", {"cards": render_cards, "session_id": session_id}
         )
@@ -305,8 +336,12 @@ def report_page(request: Request, job_id: str):
     # Fallback: template from JSON sibling
     json_path = Path(path).with_suffix(".json") if path else None
     if json_path and json_path.is_file():
+        from app.models import ChurchReport
+        from app.stage3 import report as report_module
+
         data = json.loads(json_path.read_text(encoding="utf-8"))
-        return templates.TemplateResponse(request, "report.html", {"report": data, "job_id": job_id})
+        narrative = data.pop("narrative", None)
+        return HTMLResponse(report_module.render_html(ChurchReport.model_validate(data), narrative=narrative))
     return HTMLResponse("Report still generating…", status_code=202)
 
 

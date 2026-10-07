@@ -23,10 +23,11 @@ LADDER_RUNGS: list[tuple[str, str | None]] = [
 ]
 LADDER_FEATURES = [fid for _, fid in LADDER_RUNGS if fid]
 
+# Hard triggers: self-harm / immediate danger only. Grief, past abuse, "my mom died" etc. go to the LLM check
+# (crisis_check.v2), because they are common, legitimate reasons people look for a church (R11).
 CRISIS_KEYWORDS = re.compile(
-    r"\b(suicide|suicidal|kill myself|self[- ]harm|hurt myself|abuse|abused|assault|"
-    r"rape|domestic violence|988|crisis|grief|died|death of|overdose|"
-    r"don't want to live|end my life|cutting myself)\b",
+    r"\b(suicide|suicidal|kill myself|killing myself|self[- ]harm|hurt myself|hurting myself|"
+    r"don'?t want to live|end my life|cutting myself|overdos(e|ing)|in danger right now)\b",
     re.I,
 )
 CRISIS_MESSAGE = (
@@ -111,9 +112,8 @@ def _parse_ladder_rung(text: str) -> str | None:
     m = re.search(r"\(([a-g])\)", t)
     if m:
         return m.group(1)
-    for letter, _ in LADDER_RUNGS:
-        if re.search(rf"\b{letter}\b", t):
-            return letter
+    if re.fullmatch(r"[a-g]\.?", t):          # bare letter only when it is the whole answer (R2: "a church..." != rung a)
+        return t[0]
     labels = {
         "deacon": "b",
         "deacons": "b",
@@ -128,9 +128,14 @@ def _parse_ladder_rung(text: str) -> str | None:
         "lead pastor": "g",
         "senior pastor": "g",
     }
-    for key, letter in labels.items():
-        if key in t:
-            return letter
+    best = None
+    for key, letter in labels.items():   # highest rung mentioned wins ("teach and preach" -> d)
+        if key in t and (best is None or letter > best):
+            best = letter
+    if best:
+        return best
+    if "kids" in t or "children" in t or "women's ministr" in t:
+        return "a"
     return None
 
 
@@ -164,10 +169,20 @@ def _apply_ladder(rung: str, mode: Literal["minimum", "maximum", "both"] | None)
                 prefs.append(Preference(feature=fid, want=[], weight="dont_care", said=f"rung {rung} {mode}"))
         else:
             if mode in ("maximum", "both"):
-                prefs.append(Preference(feature=fid, want=["no"], weight="important", said=f"rung {rung} {mode}"))
+                no = ["never"] if fid == "women.preach" else ["no"]   # women.preach values: regularly/occasionally/never
+                prefs.append(Preference(feature=fid, want=no, weight="important", said=f"rung {rung} {mode}"))
             else:
                 prefs.append(Preference(feature=fid, want=[], weight="dont_care", said=f"rung {rung} {mode}"))
     return prefs
+
+
+_PLACEHOLDER_VALUES = {"miles", "schedule", "language_list", "ministry_list", "topic_list", "denomination_id", "network_name",
+                       "names_roles_tenure", "change_list", "report_list", "stated_position_text"}
+
+
+def _enumerable(meta: dict) -> bool:
+    vals = meta.get("values") or []
+    return bool(vals) and not (set(vals) & _PLACEHOLDER_VALUES) and len(vals) <= 12
 
 
 def _skip_women_duplicates(questions: list[dict]) -> list[dict]:
@@ -190,7 +205,7 @@ class Interviewer:
     def __init__(self, session_id: str, *, complete_json_fn: CompleteJson | None = None):
         self.session_id = session_id
         self._llm = complete_json_fn or llm.complete_json
-        self._phase: Literal["core", "standard", "if_raised", "advanced", "readback", "done", "escalated"] = "core"
+        self._phase: Literal["core", "standard", "if_raised", "advanced", "readback", "change", "done", "escalated"] = "core"
         self._core_idx = 0
         self._std_idx = 0
         self._adv_idx = 0
@@ -207,6 +222,7 @@ class Interviewer:
         self._standard_qs = _skip_women_duplicates(stage0_questions("standard"))
         self._advanced_qs = stage0_questions("advanced")
         self._last_say = ""
+        self._pending_ladder_weight = False
 
     def profile(self) -> PreferenceProfile:
         return self._profile.model_copy(deep=True)
@@ -262,8 +278,13 @@ class Interviewer:
         if self._phase == "done":
             return {"say": "Your profile is saved. Ready to search when you are.", "options": None, "done": True, "escalation": None}
 
+        if self._pending_ladder_weight:
+            return {"say": "How important are women's roles in ministry to you when choosing a church?",
+                    "options": WEIGHT_OPTIONS, "done": False, "escalation": None}
         if self._pending_weight:
             return self._ask_weight()
+        if self._phase == "change":
+            return {"say": "What would you like to change? Tell me in your own words.", "options": None, "done": False, "escalation": None}
 
         step = self._current_step()
         if step is None:
@@ -273,7 +294,9 @@ class Interviewer:
             return {"say": text, "options": ["Yes, that's right", "I need to change something"], "done": False, "escalation": None}
 
         if step == "readback_confirm":
-            return {"say": self._last_say or self.readback(), "options": ["Yes, that's right", "I need to change something"], "done": False, "escalation": None}
+            if not self._last_say:
+                self._last_say = self.readback()
+            return {"say": self._last_say, "options": ["Yes, that's right", "I need to change something"], "done": False, "escalation": None}
 
         question = self._question_for(step)
         return self._present(question)
@@ -285,7 +308,7 @@ class Interviewer:
                 out = self._llm(
                     "crisis_check",
                     [
-                        {"role": "system", "content": llm.load_prompt("crisis_check.v1")},
+                        {"role": "system", "content": llm.load_prompt("crisis_check.v2")},
                         {"role": "user", "content": text},
                     ],
                     CRISIS_SCHEMA,
@@ -313,6 +336,27 @@ class Interviewer:
                 self._profile.likely_denominations = [m["id"] for m in matches]
                 db.save_profile(self._profile)
                 self._phase = "done"
+            elif "change" in t or t.startswith("no"):
+                self._phase = "change"          # R2: ask what to change instead of repeating the read-back
+            else:
+                self._apply_change(text)        # they typed the correction directly
+                self._last_say = ""
+            return
+
+        if self._phase == "change":
+            self._apply_change(text)
+            self._phase = "readback"
+            self._last_say = ""                 # regenerate the read-back with the change
+            return
+
+        if self._pending_ladder_weight:
+            w = _parse_weight(text)
+            if w:
+                for p in list(self._profile.preferences):
+                    if p.feature in LADDER_FEATURES and p.want:
+                        self._upsert_pref(p.model_copy(update={"weight": w}))
+                self._pending_ladder_weight = False
+                self._advance()
             return
 
         if self._pending_weight and self._pending_pref:
@@ -320,8 +364,10 @@ class Interviewer:
             if w:
                 pref = self._pending_pref.model_copy(update={"weight": w})
                 self._upsert_pref(pref)
+                self._answered.add(pref.feature)    # R2: mark answered and move on (was an infinite loop)
                 self._pending_weight = None
                 self._pending_pref = None
+                self._advance()
             return
 
         step = self._step_before_advance()
@@ -352,7 +398,7 @@ class Interviewer:
                     self._upsert_pref(pref)
                 self._answered.update(LADDER_FEATURES)
                 self._ladder_rung = None
-                self._advance()
+                self._pending_ladder_weight = True   # weight asked once for the whole ladder (features.yaml note)
         elif step == "advanced_opt_in":
             t = _norm(text)
             if t.startswith("y") or "yes" in t:
@@ -396,6 +442,8 @@ class Interviewer:
             elif "welcome" in t:
                 want = ["welcome_not_membership"]
 
+        if not want and _parse_weight(text) != "dont_care":
+            want = self._map_values(fid, text)   # free text ("a band with lights") -> allowed values via the model
         weight = _parse_weight(text) or "important"
         pref = Preference(feature=fid, want=want, weight=weight, said=text)
         if weight == "dealbreaker" and "must" not in t and "dealbreaker" not in t:
@@ -552,7 +600,55 @@ class Interviewer:
             opts = ["Affirm same-sex marriage", "Traditional marriage teaching", "Doesn't matter", "Prefer not to say"]
         elif step == "lgbtq.inclusion":
             opts = ["Full membership and leadership", "Membership open, leadership not", "Doesn't matter", "Prefer not to say"]
+        elif _enumerable(meta):
+            opts = [v.replace("_", " ") for v in meta["values"]] + ["Doesn't matter"]
         return {"id": step, "question": meta.get("question", meta["label"]), "options": opts}
+
+    def _map_values(self, fid: str, text: str) -> list[str]:
+        """Map a free-text answer to allowed values of one feature (fast model). Unknown -> []."""
+        meta = feature(fid)
+        if not _enumerable(meta):
+            return []
+        try:
+            out = self._llm(
+                "interviewer_map",
+                [{"role": "system", "content": "Map the person's answer to the allowed values of ONE church feature. "
+                                               "Return {\"want\": [allowed values the person would be happy with]}. "
+                                               "Use only the allowed values; return [] if the answer does not say."},
+                 {"role": "user", "content": f"Feature: {meta['label']}\nQuestion: {meta.get('question', '')}\n"
+                                             f"Allowed values: {meta['values']}\nAnswer: {text}"}],
+                {"type": "object", "required": ["want"], "properties": {"want": {"type": "array"}}},
+                tier="fast",
+            )
+            return [v for v in out.get("want") or [] if v in meta["values"]]
+        except Exception:
+            return []
+
+    def _apply_change(self, text: str) -> None:
+        """Read-back correction: map free text onto any features (validated), then re-read."""
+        from app.features import all_features
+
+        feats = all_features()
+        menu = {fid: m["values"] for fid, m in feats.items() if m.get("ask") != "never" and _enumerable(m)}
+        try:
+            out = self._llm(
+                "interviewer_change",
+                [{"role": "system", "content": "The person is correcting their church-search preferences. Return "
+                                               "{\"updates\": [{\"feature\": id, \"want\": [allowed values], \"weight\": "
+                                               "\"dealbreaker|important|nice_to_have|dont_care\"}]} using only the ids and values given."},
+                 {"role": "user", "content": f"Current profile: {self._profile.model_dump_json()}\n"
+                                             f"Features and allowed values: {menu}\nCorrection: {text}"}],
+                {"type": "object", "required": ["updates"], "properties": {"updates": {"type": "array"}}},
+                tier="strong",
+            )
+        except Exception:
+            return
+        for u in out.get("updates") or []:
+            if not isinstance(u, dict) or u.get("feature") not in menu:
+                continue
+            want = [v for v in u.get("want") or [] if v in menu[u["feature"]]]
+            weight = u.get("weight") if u.get("weight") in ("dealbreaker", "important", "nice_to_have", "dont_care") else "important"
+            self._upsert_pref(Preference(feature=u["feature"], want=want, weight=weight, said=text))
 
     def _present(self, question: dict[str, Any]) -> dict:
         say = question["question"]
@@ -580,16 +676,18 @@ class Interviewer:
                 INTERVIEWER_SCHEMA,
                 tier="strong",
             )
-            if out.get("skip_rest"):
-                self._skip_rest = True
+            # R2: the model only rephrases. Options stay ours (parsers depend on them); skip_rest only when the
+            # user typed "skip"; raised ids must be real if_raised features.
+            from app.features import all_features
+
+            feats = all_features()
             for upd in out.get("raised") or []:
-                if upd not in self._if_raised and upd not in self._answered:
+                if (isinstance(upd, str) and feats.get(upd, {}).get("ask") == "if_raised"
+                        and upd not in self._if_raised and upd not in self._answered):
                     self._if_raised.append(upd)
             llm_say = (out.get("say") or "").strip()
             if llm_say and llm_say.lower() != "placeholder":
                 say = llm_say
-            if out.get("options"):
-                options = out["options"]
         except (KeyError, Exception):
             pass
         self._last_say = say

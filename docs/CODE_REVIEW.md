@@ -3,7 +3,9 @@
 Scope: everything under `app/` and `app/templates/` after T0–T8 (120 tests green offline). Method: two independent reviewers read the code against PRD/ARCHITECTURE/INTERFACES and ran offline simulations; top findings spot-checked by hand.
 **Headline:** the offline build is solid (containment rules hold, no secrets logged, tool schema/ctx hiding correct, quote re-check works). But it has never touched a real API, and several paths only work with fakes. Fix the P0 items, then run one live smoke test before anything else.
 
-Fix tasks are in `tasks.json` as R1–R12 (owner per file ownership). Mark them with `scripts/tasks.py` like any task.
+Fix tasks are in `tasks.json` as R1–R12.
+
+**Status (2026-10-07 ~4 pm CT): R1–R12 fixed by Claude in one pass — 147 tests green (was 120), regression test per finding. Not yet verified live: run H6.** Extra bugs found while fixing: `features.yaml` values `yes`/`no` and `60_90`/`20_35` were parsed by YAML as booleans/integers (every women.* value check and the length buckets were silently broken) — now quoted; Stage 2 extraction never told the model the allowed values (most values were rejected) — now included; Stage 2 scored without denominational priors — fixed. Prompt versions bumped: crisis_check.v2, sermon_analyse.v2, deep_search.v2 (see PROMPT_HISTORY).
 
 ## P0 — will break the live demo
 

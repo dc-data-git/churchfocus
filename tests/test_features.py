@@ -27,3 +27,9 @@ def test_settled_rule():
     assert settled_open(same_site, ["theology.baptism"])[0] == []
     obs = [e(feature="women.preach", value="never", tier="D", how="observed", quote="", note="0 of 6 sermons")]
     assert settled_open(obs, ["women.preach"])[0] == ["women.preach"]
+
+
+def test_all_feature_values_are_strings():
+    """YAML turns unquoted yes/no into booleans and 60_90 into 6090 — every value must stay a string."""
+    bad = {k: [v for v in m["values"] if not isinstance(v, str)] for k, m in all_features().items()}
+    assert not {k: v for k, v in bad.items() if v}

@@ -60,9 +60,9 @@ features:
                               question: "Where would you be coming from, and how far is too far to drive on a Sunday?"}
   logistics.service_times:   {label: Service times, values: [schedule], ask: standard, stage: 1, sources: [places_api, website, osm],
                               question: "Are there days or times that work best (Sunday morning, Saturday evening, Sunday night)?"}
-  logistics.service_length:  {label: Service length, values: [under_60, 60_90, over_90], ask: standard, stage: 2, sources: [livestream, website], denom_field: practice_culture.service_length, observed: true,
+  logistics.service_length:  {label: Service length, values: [under_60, "60_90", over_90], ask: standard, stage: 2, sources: [livestream, website], denom_field: practice_culture.service_length, observed: true,
                               question: "How long a service feels right: about an hour, an hour and a half, or longer is fine?"}
-  logistics.sermon_length:   {label: Sermon length, values: [under_20, 20_35, over_35], ask: standard, stage: 3, sources: [sermon_feed, livestream], observed: true,
+  logistics.sermon_length:   {label: Sermon length, values: [under_20, "20_35", over_35], ask: standard, stage: 3, sources: [sermon_feed, livestream], observed: true,
                               question: "When the pastor preaches, would you rather it be short (under 20 min), medium, or long and in-depth?"}
   logistics.size:            {label: Size, values: [small, medium, large, mega], ask: standard, stage: 2, sources: [denomination_stats, website, places_api],
                               question: "Picture walking in: do you want to know most people by name (under 100), a mid-size church, or a big church with lots of programs?"}
@@ -112,15 +112,15 @@ features:
   preaching.topics:          {label: Recurring topics, values: [topic_list], ask: never, stage: 3, sources: [sermon_feed, sermon_transcript], observed: true}
 
   # --- women in ministry ladder (Katie's breakdown). Stage 0 asks ONE ladder question, maps to these. ---
-  women.senior_pastor:       {label: Woman can be lead pastor, values: [yes, no], ask: core, stage: 2, sources: [statement_of_faith, staff_page], denom_field: governance.women_senior_pastors, sensitive: true, observed: true,
+  women.senior_pastor:       {label: Woman can be lead pastor, values: ["yes", "no"], ask: core, stage: 2, sources: [statement_of_faith, staff_page], denom_field: governance.women_senior_pastors, sensitive: true, observed: true,
                               question: "LADDER: Churches differ on which roles women hold. Going up this list, how far would you be comfortable seeing women serve? (a) kids' and women's ministries (b) deacons (c) teaching mixed adult classes (d) preaching on a Sunday sometimes (e) associate or other pastors (f) elders (g) lead pastor. Or: no preference. FOLLOW-UP: Is that something you need to see (a minimum), as far as you're comfortable going (a maximum), or both?",
                               note: "Mapping: rung R chosen. Roles above R: want=[no] if maximum/both, else dont_care. Roles at or below R: want=[yes] (women.preach: [regularly, occasionally]) if minimum/both, else dont_care. Weight asked separately."}
-  women.pastor_other:        {label: Woman can be associate pastor, values: [yes, no], ask: core, stage: 2, sources: [staff_page, statement_of_faith], denom_field: governance.women_ordination, sensitive: true, observed: true}
-  women.elder:               {label: Woman can be elder, values: [yes, no], ask: core, stage: 2, sources: [staff_page, statement_of_faith], denom_field: governance.women_ordination, sensitive: true, observed: true}
+  women.pastor_other:        {label: Woman can be associate pastor, values: ["yes", "no"], ask: core, stage: 2, sources: [staff_page, statement_of_faith], denom_field: governance.women_ordination, sensitive: true, observed: true}
+  women.elder:               {label: Woman can be elder, values: ["yes", "no"], ask: core, stage: 2, sources: [staff_page, statement_of_faith], denom_field: governance.women_ordination, sensitive: true, observed: true}
   women.preach:              {label: Women preach on Sunday, values: [regularly, occasionally, never], ask: core, stage: 3, sources: [sermon_feed, statement_of_faith], denom_field: governance.women_preaching, sensitive: true, observed: true,
                               note: "Stated policy vs observed share of sermons by women (D6). Show both when they differ."}
-  women.teach_mixed_adults:  {label: Women teach mixed adult classes, values: [yes, no], ask: core, stage: 2, sources: [website, calendar], sensitive: true, observed: true}
-  women.deacon:              {label: Woman can be deacon, values: [yes, no], ask: core, stage: 2, sources: [staff_page, statement_of_faith], sensitive: true, observed: true}
+  women.teach_mixed_adults:  {label: Women teach mixed adult classes, values: ["yes", "no"], ask: core, stage: 2, sources: [website, calendar], sensitive: true, observed: true}
+  women.deacon:              {label: Woman can be deacon, values: ["yes", "no"], ask: core, stage: 2, sources: [staff_page, statement_of_faith], sensitive: true, observed: true}
   women.home_roles:          {label: Teaching on marriage roles, values: [egalitarian, complementarian], ask: advanced, stage: 3, sources: [statement_of_faith, sermon_transcript], sensitive: true}
 
   # --- LGBTQ (asked as a standard question; neutral wording; 'prefer not to say' = dont_care) ---

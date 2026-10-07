@@ -23,6 +23,9 @@ from app.web import Blocked, fetch
 
 AUDIO_MAX_BYTES = 24 * 1024 * 1024
 CHUNK_MAX_SECONDS = 20 * 60
+DOWNLOAD_MAX_BYTES = 150 * 1024 * 1024   # R7: never pull a 1 GB video into memory
+AUDIO_EXTS = (".mp3", ".m4a", ".mp4", ".mpeg", ".mpga", ".wav", ".webm", ".ogg", ".aac")
+SPEAKER_KNOWN_MIN = 5                    # women.preach only from >= 5 sermons with an identifiable speaker
 
 _FEED_HINTS: list[tuple[str, re.Pattern[str]]] = [
     ("rss", re.compile(r"(?i)(/feed\b|/rss\b|\.xml\b|type=rss|podcast[-_]?feed)")),
@@ -38,6 +41,7 @@ SERMON_ANALYSE_SCHEMA: dict[str, Any] = {
     "required": [
         "speaker",
         "speaker_role",
+        "speaker_gender",
         "minutes",
         "style",
         "main_texts",
@@ -51,7 +55,7 @@ SERMON_ANALYSE_SCHEMA: dict[str, Any] = {
     "properties": {
         "speaker": {"type": "string"},
         "speaker_role": {"type": "string"},
-        "speaker_gender": {"type": "string"},
+        "speaker_gender": {"type": "string", "enum": ["female", "male", "unknown"]},
         "minutes": {"type": "number"},
         "style": {"type": "string"},
         "main_texts": {"type": "array"},
@@ -234,10 +238,11 @@ def get_sermons(
 ) -> dict[str, Any]:
     """Parse a sermon RSS/Atom feed; return items newest first."""
     cap = min(limit or get_settings().deep_max_sermons, get_settings().deep_max_sermons)
-    if feed_text is not None:
-        parsed = feedparser.parse(feed_text)
-    else:
-        parsed = feedparser.parse(feed_url)
+    if feed_text is None:
+        feed_text = _fetch_feed_text(feed_url)
+        if feed_text is None:
+            return {"feed_url": feed_url, "items": [], "error": "feed could not be fetched"}
+    parsed = feedparser.parse(feed_text)
 
     items: list[dict[str, Any]] = []
     for entry in parsed.entries:
@@ -257,17 +262,56 @@ def get_sermons(
     return {"feed_url": feed_url, "items": items[:cap]}
 
 
+def _fetch_feed_text(url: str) -> str | None:
+    """R7: fetch feeds ourselves (30 s timeout, blocklist) instead of feedparser.parse(url), which has no timeout."""
+    from app.web import _is_blocklisted, _ua
+
+    if _is_blocklisted(url):
+        return None
+    try:
+        with httpx.Client(follow_redirects=True, timeout=30.0, headers={"User-Agent": _ua()}) as c:
+            resp = c.get(url)
+        if resp.status_code != 200:
+            return None
+        return resp.text
+    except httpx.HTTPError:
+        return None
+
+
+def _audio_suffix(url: str, content_type: str = "") -> str:
+    path = urlparse(url).path.lower()
+    for ext in AUDIO_EXTS:
+        if path.endswith(ext):
+            return ext
+    ct = content_type.lower()
+    if "mp4" in ct or "m4a" in ct or "aac" in ct:
+        return ".m4a"
+    if "wav" in ct:
+        return ".wav"
+    if "ogg" in ct:
+        return ".ogg"
+    return ".mp3"
+
+
 def _download_audio(url: str, dest: Path, client: httpx.Client | None = None) -> Path:
+    """Stream to disk with a size cap. Returns the path actually written (suffix fixed from URL/content-type)."""
     dest.parent.mkdir(parents=True, exist_ok=True)
-    if client is not None:
-        resp = client.get(url)
-        resp.raise_for_status()
-        dest.write_bytes(resp.content)
-        return dest
-    with httpx.Client(follow_redirects=True, timeout=120.0) as c:
-        resp = c.get(url)
-        resp.raise_for_status()
-        dest.write_bytes(resp.content)
+    own = client is None
+    c = client or httpx.Client(follow_redirects=True, timeout=httpx.Timeout(30.0, read=120.0))
+    try:
+        with c.stream("GET", url) as resp:
+            resp.raise_for_status()
+            dest = dest.with_suffix(_audio_suffix(url, resp.headers.get("content-type", "")))
+            size = 0
+            with dest.open("wb") as f:
+                for chunk in resp.iter_bytes():
+                    size += len(chunk)
+                    if size > DOWNLOAD_MAX_BYTES:
+                        raise ValueError(f"audio larger than {DOWNLOAD_MAX_BYTES // (1024 * 1024)} MB; skipped")
+                    f.write(chunk)
+    finally:
+        if own:
+            c.close()
     return dest
 
 
@@ -354,9 +398,13 @@ def _fetch_transcript(url: str) -> str | None:
 
 
 def _transcribe_file(path: Path) -> str:
-    if path.stat().st_size > AUDIO_MAX_BYTES:
+    """R7: always normalise to mono mp3 in <= 20-minute chunks (transcription models cap per-request duration).
+    If ffmpeg can't read the file, fall back to sending it as-is when it is small enough."""
+    try:
         chunks = prepare_audio_chunks(path)
-    else:
+    except (subprocess.CalledProcessError, OSError):
+        if path.stat().st_size > AUDIO_MAX_BYTES:
+            raise
         chunks = [path]
     parts: list[str] = []
     for chunk in chunks:
@@ -402,13 +450,12 @@ def transcribe_sermon(
             )
             return {"text": text, "minutes": minutes, "speaker": speaker, "source": "transcript_url"}
 
-    audio_url = item.get("audio_url") or item.get("video_url")
+    audio_url = item.get("audio_url")          # R7: never download video
     if not audio_url:
         return {"text": "", "minutes": 0.0, "speaker": speaker, "source": "missing_audio"}
 
-    safe_name = re.sub(r"[^\w.-]+", "_", title)[:80]
-    dest = _audio_cache_dir() / f"{safe_name}.audio"
-    _download_audio(audio_url, dest, client=http_client)
+    safe_name = re.sub(r"[^\w-]+", "_", title)[:80] or "sermon"
+    dest = _download_audio(audio_url, _audio_cache_dir() / f"{safe_name}.mp3", client=http_client)
 
     text = _transcribe_file(dest)
     minutes = _audio_duration_seconds(dest) / 60.0
@@ -451,7 +498,7 @@ def transcribe_sermons_parallel(
 
 
 def _analyse_one_sermon(text: str, metadata: dict[str, Any]) -> dict[str, Any]:
-    prompt = load_prompt("sermon_analyse.v1")
+    prompt = load_prompt("sermon_analyse.v2")
     user = {
         "metadata": metadata,
         "transcript": text[:50_000],
@@ -496,54 +543,53 @@ def _women_preach_value(female_count: int, total: int) -> str:
     return "occasionally"
 
 
+def _allowed(feature_id: str, value: str) -> bool:
+    from app.features import all_features
+
+    meta = all_features().get(feature_id) or {}
+    return value in (meta.get("values") or [])
+
+
 def _aggregate_evidence(analyses: list[dict[str, Any]], features: list[str]) -> list[Evidence]:
+    """Observed tier-D evidence. Every note has the form "k of n sermons ..." so features.data_points() can
+    count observations (settled at n >= 5)."""
     if not analyses:
         return []
 
     n = len(analyses)
-    female = sum(1 for a in analyses if (a.get("speaker_gender") or "").lower() == "female")
-    minutes_list = [float(a.get("minutes") or 0) for a in analyses if a.get("minutes")]
-    median_minutes = sorted(minutes_list)[len(minutes_list) // 2] if minutes_list else 0.0
-
     out: list[Evidence] = []
     checked = now()
     feature_set = set(features)
 
-    def add(feature: str, value: str, note: str = "") -> None:
-        if feature not in feature_set:
-            return
-        out.append(
-            Evidence(
-                feature=feature,
-                value=value,
-                tier="D",
-                how="observed",
-                source_kind="sermon_transcript",
-                checked_at=checked,
-                note=note,
-            )
-        )
+    def add(feature: str, value: str, note: str) -> None:
+        if feature in feature_set and _allowed(feature, value):
+            out.append(Evidence(feature=feature, value=value, tier="D", how="observed",
+                                source_kind="sermon_transcript", checked_at=checked, note=note))
 
-    if "women.preach" in feature_set:
-        add("women.preach", _women_preach_value(female, n), f"{female} of {n} sermons")
+    # women.preach: count only sermons whose speaker could be identified (R7: unknown never means "male")
+    genders = [(a.get("speaker_gender") or "unknown").lower() for a in analyses]
+    known = [g for g in genders if g in ("female", "male")]
+    female = sum(1 for g in known if g == "female")
+    if len(known) >= SPEAKER_KNOWN_MIN:
+        add("women.preach", _women_preach_value(female, len(known)),
+            f"{female} of {len(known)} sermons with an identifiable speaker were preached by women")
 
-    if "logistics.sermon_length" in feature_set and median_minutes > 0:
-        add("logistics.sermon_length", _minutes_to_sermon_length(median_minutes), f"median {median_minutes:.0f} min from {n} sermons")
+    minutes_list = [float(a.get("minutes") or 0) for a in analyses if a.get("minutes")]
+    if minutes_list:
+        buckets = [_minutes_to_sermon_length(m) for m in minutes_list]
+        top = _mode(buckets)
+        median = sorted(minutes_list)[len(minutes_list) // 2]
+        add("logistics.sermon_length", top, f"{buckets.count(top)} of {len(buckets)} sermons; median {median:.0f} min")
 
-    if "preaching.style" in feature_set:
-        add("preaching.style", _mode([str(a.get("style") or "") for a in analyses if a.get("style")]))
+    for fid, key in (("preaching.style", "style"), ("preaching.audience", "audience"),
+                     ("preaching.scripture_density", "scripture_density")):
+        vals = [str(a.get(key) or "") for a in analyses if a.get(key)]
+        if vals:
+            top = _mode(vals)
+            add(fid, top, f"{vals.count(top)} of {len(vals)} sermons {top.replace('_', ' ')}")
 
-    if "preaching.audience" in feature_set:
-        add("preaching.audience", _mode([str(a.get("audience") or "") for a in analyses if a.get("audience")]))
-
-    if "preaching.scripture_density" in feature_set:
-        add(
-            "preaching.scripture_density",
-            _mode([str(a.get("scripture_density") or "") for a in analyses if a.get("scripture_density")]),
-        )
-
-    if "preaching.politics_frequency" in feature_set:
-        add("preaching.politics_frequency", _politics_frequency(analyses), f"from {n} sermons")
+    mentioned = sum(1 for a in analyses if float(a.get("politics_mentions") or 0) > 0)
+    add("preaching.politics_frequency", _politics_frequency(analyses), f"{mentioned} of {n} sermons mentioned politics or current events")
 
     return out
 

@@ -470,3 +470,81 @@ class TestReport:
         html = report_module.render_html(rep, narrative=narrative)
         assert "@media print" in html
         assert "Save as PDF" in html or "Print" in html
+
+
+# ---------------------------------------------------------------- code review regressions (R6, R10)
+from app.stage3.agent import deep_search  # noqa: E402
+
+
+class TestReviewRegressions:
+    def _ev(self, **kw):
+        base = dict(feature="lgbtq.marriage", value="traditional", tier="A", quote="q" * 20,
+                    url="https://grace-baptist.fixture/beliefs", source_kind="statement_of_faith", how="stated")
+        base.update(kw)
+        return base
+
+    def test_parallel_tool_calls_keep_tool_messages_contiguous(self, data_dir, monkeypatch):
+        FakeWeb(pages=_beliefs_page(), robots={"grace-baptist.fixture": "User-agent: *\nAllow: /\n"}).install(monkeypatch)
+        profile = _profile(("lgbtq.marriage", ["traditional"], "important"))
+        seen = []
+
+        def chat(task, messages, tools_, tier="strong", **kw):
+            seen.append(messages)
+            if len(seen) == 1:
+                return {"content": "", "tool_calls": [
+                    {"id": "a", "function": {"name": "fetch_page", "arguments": json.dumps({"url": "https://grace-baptist.fixture/beliefs", "why": "x"})}},
+                    {"id": "b", "function": {"name": "record_evidence", "arguments": json.dumps({"why": "x", "evidence": []})}},
+                    {"id": "c", "function": {"name": "find_sermon_feeds", "arguments": json.dumps({"why": "x"})}}]}
+            return {"content": "", "tool_calls": [{"id": "z", "function": {"name": "finish", "arguments": json.dumps({"summary": "done", "why": "x"})}}]}
+
+        monkeypatch.setattr("app.stage3.agent.chat_tools", chat)
+        deep_search(_church(), profile, "jpar")
+        second = seen[1]
+        i = next(k for k, m in enumerate(second) if m.get("role") == "assistant" and m.get("tool_calls"))
+        assert [m["role"] for m in second[i + 1:i + 4]] == ["tool", "tool", "tool"]
+
+    def test_failing_tool_and_failing_model_never_leave_job_running(self, data_dir, monkeypatch):
+        profile = _profile(("lgbtq.marriage", ["traditional"], "important"))
+        monkeypatch.setattr("app.stage3.tools.fetch", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+        calls = {"n": 0}
+
+        def chat(task, messages, tools_, tier="strong", **kw):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return {"content": "", "tool_calls": [{"id": "a", "function": {"name": "fetch_page", "arguments": json.dumps({"url": "https://x.org", "why": "x"})}}]}
+            raise RuntimeError("rate limited")
+
+        monkeypatch.setattr("app.stage3.agent.chat_tools", chat)
+        deep_search(_church(), profile, "jerr")
+        from app import db as _db
+        job = _db.get_job("jerr")
+        assert job["status"] == "error" and job["report_path"]
+
+    def test_tier_d_and_prior_cannot_be_recorded_by_agent(self, data_dir):
+        ctx = _ctx(data_dir)
+        r = tools.record_evidence(ctx, [self._ev(feature="women.preach", value="never", tier="D", quote="", note="0 of 9 sermons")])
+        assert r["ok"] is False and "analyse_sermons" in r["errors"][0]
+
+    def test_unstated_is_allowed(self, data_dir, monkeypatch):
+        FakeWeb(pages=_beliefs_page(), robots={"grace-baptist.fixture": "User-agent: *\nAllow: /\n"}).install(monkeypatch)
+        ctx = _ctx(data_dir)
+        tools.fetch_page(ctx, "https://grace-baptist.fixture/beliefs")
+        r = tools.record_evidence(ctx, [self._ev(feature="lgbtq.inclusion", value="unstated", quote="")])
+        assert r["ok"] is True
+
+    def test_marriage_definition_cannot_set_inclusion(self):
+        from app.evidence_rules import marriage_rule_violation
+        assert marriage_rule_violation("lgbtq.inclusion", "membership_not_leadership", "We believe marriage is between one man and one woman.")
+        assert not marriage_rule_violation("lgbtq.inclusion", "full", "LGBTQ people are welcome as members and may serve as elders.")
+        assert not marriage_rule_violation("lgbtq.marriage", "affirming", "We celebrate marriage between any two people.")   # affirming kept
+
+    def test_compaction_keeps_one_state_and_trims_old_results(self):
+        from app.stage3.agent import _compact
+        msgs = [{"role": "system", "content": "s"}, {"role": "user", "content": "CURRENT STATE 1"}]
+        for k in range(4):
+            msgs += [{"role": "assistant", "content": "", "tool_calls": [{"id": str(k)}]},
+                     {"role": "tool", "tool_call_id": str(k), "content": "x" * 5000},
+                     {"role": "user", "content": f"CURRENT STATE {k + 2}"}]
+        out = _compact(msgs)
+        assert sum(1 for m in out if str(m.get("content", "")).startswith("CURRENT STATE")) == 1
+        assert len(out[3]["content"]) < 1000 and len(out[-2]["content"]) == 5000
