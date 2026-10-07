@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+config.yaml
+run_overnight.out
+# raw corpus never goes in git
+data/raw/*
+!data/raw/README.txt
+# stage outputs stay local, except the shareable results
+work/*
+!work/out/
+!work/14_report/
+work_dryrun/

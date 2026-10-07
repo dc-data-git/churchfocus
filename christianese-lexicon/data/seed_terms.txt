@@ -1,0 +1,100 @@
+# Seed terms: always included in the shortlist so known-important terms are
+# analyzed even if rare in the corpus. One per line. '#' lines are comments.
+# Source: team brainstorm + public newcomer glossaries used as a CHECKLIST only.
+
+# worship & practice
+contemporary
+contemporary worship
+traditional
+traditional worship
+blended
+blended worship
+liturgical
+liturgy
+high church
+low church
+spirit-filled
+spirit-led
+charismatic
+pentecostal
+altar call
+worship team
+worship leader
+praise and worship
+hymns
+choir
+communion
+eucharist
+the lord's supper
+mass
+sacrament
+ordinance
+lectionary
+revival
+testimony
+
+# doctrine shorthand
+bible-believing
+bible-based
+gospel-centered
+christ-centered
+reformed
+calvinist
+arminian
+wesleyan
+evangelical
+fundamentalist
+inerrant
+sound doctrine
+expository preaching
+complementarian
+egalitarian
+open and affirming
+affirming
+progressive
+orthodox
+dispensational
+word and sacrament
+
+# polity & structure
+elder-led
+congregational
+multisite
+house church
+church plant
+nondenominational
+independent
+denomination
+church family
+
+# culture & identity
+seeker-sensitive
+seeker-friendly
+attractional
+missional
+family-integrated
+multiethnic
+welcoming
+inclusive
+authentic
+come as you are
+doing life together
+community
+small groups
+life groups
+sunday school
+discipleship
+legalistic
+judgmental
+political
+woke
+safe
+
+# community & ministries
+kids ministry
+youth group
+young adults
+recovery ministry
+celebrate recovery
+outreach
+missions

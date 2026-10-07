@@ -1,0 +1,62 @@
+# Controlled feature vocabulary: the shared feature space between user
+# preferences (Stage 0) and church evidence (Stages 1-3).
+#
+# Every lexicon entry must express its meaning(s) using ONLY these feature ids.
+# The drafting model may propose new ones, but they must be prefixed
+# "proposed." and are flagged for human review.
+#
+# Format: feature_id: {desc, values, observable_via}
+# Worship items marked [NCS] follow the National Congregations Study items.
+
+logistics.distance:            {desc: "Drive/walk distance from a fixed location", values: [number_miles], observable_via: [places_api]}
+logistics.service_time:        {desc: "Day/time of main services", values: [schedule], observable_via: [website, osm, church_center]}
+logistics.service_length:      {desc: "Total length of main service", values: [minutes], observable_via: [livestream]}
+logistics.sermon_length:       {desc: "Length of the sermon", values: [minutes], observable_via: [livestream, sermon_audio]}
+logistics.size:                {desc: "Typical weekend attendance", values: [small, medium, large, mega], observable_via: [website, photos, livestream]}
+logistics.multisite:           {desc: "Multiple campuses / video-venue preaching", values: [yes, no], observable_via: [website]}
+logistics.language:            {desc: "Language(s) of services", values: [language_list], observable_via: [website, livestream]}
+logistics.accessibility:       {desc: "Physical/sensory accessibility provisions", values: [present, absent, unknown], observable_via: [website]}
+
+worship.music.drums:           {desc: "Drums used in worship [NCS]", values: [present, absent], observable_via: [livestream, photos]}
+worship.music.band:            {desc: "Band-led music (guitars, keys, drums)", values: [present, absent], observable_via: [livestream, photos]}
+worship.music.organ:           {desc: "Organ-led music", values: [present, absent], observable_via: [livestream, photos]}
+worship.music.choir:           {desc: "Choir sings [NCS]", values: [present, absent], observable_via: [livestream, photos, website]}
+worship.music.repertoire:      {desc: "Song repertoire", values: [modern_worship, hymns, mixed, gospel, chant, psalms_only], observable_via: [livestream, website]}
+worship.lyrics_display:        {desc: "Lyrics projected on screens [NCS: visual projection]", values: [projected, hymnal, both], observable_via: [livestream, photos]}
+worship.written_order:         {desc: "Written order of service / bulletin [NCS]", values: [present, absent], observable_via: [website, photos]}
+worship.liturgy:               {desc: "Set liturgy: creeds, responsive readings, set prayers", values: [high, some, none], observable_via: [livestream, website]}
+worship.lectionary:            {desc: "Readings follow a lectionary/church calendar", values: [yes, no], observable_via: [website, sermon_titles]}
+worship.vestments:             {desc: "Leaders wear robes/vestments [NCS]", values: [present, absent], observable_via: [livestream, photos]}
+worship.dress_norm:            {desc: "Typical congregational dress", values: [casual, mixed, formal], observable_via: [photos, livestream]}
+worship.expressiveness:        {desc: "Raised hands, applause, calling out amen, dancing [NCS]", values: [high, some, low], observable_via: [livestream]}
+worship.charismatic_gifts:     {desc: "Tongues, prophecy, healing prayer practiced publicly", values: [public, private_only, absent], observable_via: [livestream, sermons, website]}
+worship.communion_frequency:   {desc: "How often communion/Eucharist is served", values: [weekly, monthly, quarterly, other], observable_via: [website, livestream]}
+worship.altar_call:            {desc: "Invitation/altar call at end of service", values: [regular, occasional, absent], observable_via: [livestream]}
+worship.production:            {desc: "Stage lighting, haze, production values", values: [high, some, low], observable_via: [livestream, photos]}
+worship.testimony:             {desc: "Testimony by non-leaders [NCS]", values: [regular, occasional, absent], observable_via: [livestream, sermons]}
+
+preaching.style:               {desc: "Expository (verse-by-verse) vs topical", values: [expository, topical, lectionary_homily, mixed], observable_via: [sermon_titles, sermons]}
+preaching.scripture_density:   {desc: "How heavily sermons cite Scripture", values: [high, medium, low], observable_via: [sermons]}
+preaching.speakers_women:      {desc: "Women preach in main services", values: [regularly, occasionally, never], observable_via: [sermon_metadata, staff_page]}
+preaching.guest_frequency:     {desc: "Share of sermons by guest/non-staff preachers", values: [percent], observable_via: [sermon_metadata]}
+preaching.topics:              {desc: "Recurring sermon topics", values: [topic_list], observable_via: [sermons]}
+
+belief.women_leadership:       {desc: "Women in pastoral/elder roles", values: [all_roles, all_but_senior, distinct_roles, unstated], observable_via: [statement_of_faith, staff_page, sermons]}
+belief.baptism:                {desc: "Baptism practice", values: [believers_immersion, infant, both, unstated], observable_via: [statement_of_faith, website]}
+belief.scripture_authority:    {desc: "Stated view of Scripture", values: [inerrant, infallible, inspired, unstated], observable_via: [statement_of_faith]}
+belief.sacramental_view:       {desc: "Sacraments vs ordinances", values: [sacramental, memorial, unstated], observable_via: [statement_of_faith, website]}
+belief.soteriology:            {desc: "Reformed/Calvinist vs Arminian/Wesleyan emphasis", values: [reformed, arminian, mixed, unstated], observable_via: [statement_of_faith, network_membership, sermons]}
+belief.end_times:              {desc: "Eschatology emphasis", values: [dispensational, other, unstated], observable_via: [statement_of_faith, sermons]}
+belief.lgbtq_policy:           {desc: "Stated policy on LGBTQ membership/marriage/leadership (handled only when user raises it)", values: [affirming, non_affirming, unstated], observable_via: [statement_of_faith, website, denomination]}
+belief.creeds:                 {desc: "Uses historic creeds/confessions", values: [yes, no], observable_via: [website, livestream]}
+
+polity.governance:             {desc: "Who governs", values: [elder_led, congregational, episcopal, pastor_led, board_led], observable_via: [website, denomination]}
+polity.affiliation:            {desc: "Denomination/network affiliation", values: [name, independent], observable_via: [locators, website]}
+
+community.small_groups:        {desc: "Small groups / life groups / Sunday school", values: [present, absent], observable_via: [church_center, website]}
+community.kids_ministry:       {desc: "Children's ministry during service", values: [present, absent], observable_via: [website, church_center]}
+community.youth_ministry:      {desc: "Youth ministry", values: [present, absent], observable_via: [website, church_center]}
+community.age_mix:             {desc: "Age profile of congregation", values: [young, mixed, older], observable_via: [photos, livestream]}
+community.ethnic_mix:          {desc: "Multiethnic congregation/leadership", values: [multiethnic, predominantly_one, unknown], observable_via: [photos, staff_page]}
+community.outreach:            {desc: "Local service, justice, missions emphasis", values: [high, some, low], observable_via: [website, church_center, sermons]}
+community.recovery:            {desc: "Recovery ministry (e.g., Celebrate Recovery)", values: [present, absent], observable_via: [church_center, website]}

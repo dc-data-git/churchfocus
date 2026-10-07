@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LexiconEntryDraft",
+  "description": "What the drafting model must return for one term. The pipeline adds term, evidence_stats and provenance afterwards.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "relevance",
+    "aliases",
+    "category",
+    "term_types",
+    "senses",
+    "disambiguation_question",
+    "neutral_options",
+    "notes"
+  ],
+  "properties": {
+    "relevance": {
+      "type": "string",
+      "enum": [
+        "church_vocabulary",
+        "logistics_term",
+        "not_relevant"
+      ],
+      "description": "not_relevant = generic boilerplate or a phrase fragment that needs no translation (e.g. 'thanks in advance', 'parking is behind'). Such terms are dropped."
+    },
+    "aliases": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Other spellings or near-synonyms seen in the contexts."
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "logistics",
+        "worship",
+        "preaching",
+        "belief",
+        "polity",
+        "community",
+        "culture"
+      ]
+    },
+    "term_types": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "descriptive",
+          "polysemous",
+          "contested",
+          "evaluative",
+          "negatable",
+          "politically_coded"
+        ]
+      },
+      "minItems": 1
+    },
+    "senses": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "gloss",
+          "traditions",
+          "features"
+        ],
+        "properties": {
+          "gloss": {
+            "type": "string",
+            "description": "Plain-language meaning in neutral terms, as people who use it would describe it."
+          },
+          "traditions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Traditions where this sense is typical, or ['all']."
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "feature",
+                "value"
+              ],
+              "properties": {
+                "feature": {
+                  "type": "string",
+                  "description": "A feature id from the controlled vocabulary, or 'proposed.<id>'."
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "disambiguation_question": {
+      "type": "string",
+      "description": "One neutral question Stage 0 can ask when a user says this term. Empty string if the term is unambiguous."
+    },
+    "neutral_options": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "For contested terms: 2-4 positions, each described as its own adherents would. Empty otherwise."
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}

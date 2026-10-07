@@ -1,0 +1,34 @@
+# Domain-generic words: churchy, but not vocabulary anyone needs translated.
+# Excluded from the shortlist unless they are also seed terms. Edit freely.
+church
+churches
+sunday
+sundays
+worship
+service
+services
+pastor
+pastors
+god
+jesus
+christ
+lord
+bible
+scripture
+faith
+christian
+christians
+people
+week
+weekend
+today
+tonight
+join
+everyone
+members
+ministry
+ministries
+sermon
+sermons
+prayer
+pray
