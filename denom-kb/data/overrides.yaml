@@ -11,4 +11,7 @@
 #   wikipedia: Amish
 # nbcusa:
 #   wikipedia: National Baptist Convention, USA, Inc.
-{}
+nondenominational:        # census category, not an organization: the movement article is the right source
+  wikipedia: Non-denominational Christianity
+catholic:                 # worldwide article (match.v2 should accept it; pinned so it never depends on the model)
+  wikipedia: Catholic Church

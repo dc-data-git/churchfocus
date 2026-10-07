@@ -1,11 +1,15 @@
 """Versioned prompts. When you change one: copy the old text into PROMPT_HISTORY.md with what
 was wrong, bump the version, and re-run (cached calls for unchanged prompts are reused)."""
 
-MATCH_VERSION = "match.v1"
-MATCH_SYSTEM = """You check whether an encyclopedia article is about a specific US religious group.
-The group comes from the 2020 US Religion Census. Answer "yes" only if the article is about this
-exact body (or it is plainly the same organization under another name). Answer "no" if it is about a
-broader tradition, a different body with a similar name, or a concept. Answer "unsure" otherwise."""
+MATCH_VERSION = "match.v2"
+MATCH_SYSTEM = """You check whether an encyclopedia article is a usable source about a specific US religious group.
+The group comes from the 2020 US Religion Census. Answer "yes" if the article is about:
+- this exact body, or the same organization under another name, or
+- the single worldwide church or communion of which this census group is simply the US part
+  (e.g. census "Catholic Church" and the article "Catholic Church"; census "Greek Orthodox
+  Archdiocese of America" and an article on the Greek Orthodox Church), because its doctrine is the same.
+Answer "no" if it is about a different body with a similar name, a broad family of many separate
+denominations (e.g. "Baptists" for one specific Baptist convention), or a concept. Otherwise "unsure"."""
 MATCH_SCHEMA = {
     "type": "object", "additionalProperties": False, "required": ["same_group", "reason"],
     "properties": {"same_group": {"type": "string", "enum": ["yes", "no", "unsure"]}, "reason": {"type": "string"}},

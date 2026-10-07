@@ -23,7 +23,34 @@ URL, source type and confidence, ready for human review.
 
 ---
 
-## Quick start (WSL2 / Ubuntu; Ollama on Windows or Linux)
+## Quick start: Windows (PowerShell)
+
+Needs Python 3.12 or 3.13 from python.org (prebuilt wheels exist for every dependency, so nothing
+is compiled; that matters if Smart App Control is on) and Ollama for Windows (ollama.com).
+
+```powershell
+git pull
+cd church-discorvery-hackathon\denom-kb
+
+ollama pull qwen2.5:7b                       # ~4.7 GB; fits 8 GB VRAM with 8k context
+py -3 -m venv .venv
+.venv\Scripts\Activate.ps1                   # if blocked: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+pip install -r requirements.txt
+copy config.example.yaml config.yaml
+notepad config.yaml                          # web.user_agent: put a contact email or URL (Wikipedia asks for one)
+
+$env:PYTHONUTF8 = "1"
+python -m denomkb doctor                     # workbook, Wikipedia, model server
+python -m denomkb run --max 3                # 3 largest groups (~30-40 min); then open work\out\report.md
+powershell -ExecutionPolicy Bypass -File scripts\run_overnight.ps1     # everything, in the background
+python -m denomkb status                     # progress
+```
+
+`run_overnight.ps1` runs `doctor` first, stops the PC sleeping while it's plugged in
+(`powercfg /change standby-timeout-ac 0`; set it back to 30 afterwards), and starts the run
+minimized. Logs go to `run_overnight.err` (follow with `Get-Content run_overnight.err -Wait -Tail 20`).
+
+## Quick start: Linux / WSL2
 
 ```bash
 git pull
