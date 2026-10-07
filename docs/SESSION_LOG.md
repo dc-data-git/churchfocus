@@ -28,3 +28,19 @@ Goal: M0 by 4 pm CT, M1 by 8 pm, submit by 10 pm CT. Start with T0 (Daniel). Not
 - Built `app/denom/kb.py` (find / get / prior / variability / compare / match_profile), `app/denom/curated.yaml`, `app/match.py`, `app/denom/mcp_server.py` (mcp 2.x MCPServer, 1.x fallback), plus shared `config.py`, `models.py`, `features.py`, `requirements.txt`. 23 tests green.
 - Finding: KB prior coverage is thin (e.g. women.senior_pastor 17 groups, lgbtq.marriage 6, baptism 45 of 217 after the sensitive gate). Matching leans on church evidence; priors only nudge. More coverage after verify.v2 + Katie's sensitive review + redo-empty.
 - features.v3 fixes: women.elder prior now from governance.women_ordination; dropped bad prior links (women.deacon←deacons_role, covenant_framework←israel_church_relationship). Unknown dealbreaker penalty set to −0.1×w.
+
+## Window 3 — Build day (Oct 7 afternoon)
+- Stages 0–3 + routes + offline + offline eval landed; pytest ~120 green (incl. guardrails).
+- Offline denom resolve seed: top-1 77%, confident 100% (`eval/results.md`).
+
+## T8.3 — Persona role-play (Katie) — fill live
+
+Run three personas in the live app (`run.bat`). Log issues with severity (blocker / major / minor).
+
+| Persona | Script | Result | Issues (severity) |
+|---|---|---|---|
+| 1 Campus pastor / Catholic student / YA group dealbreaker | EVAL_PLAN §4 #1 | _pending_ | |
+| 2 Nonprofit / Spanish family / kids / accessibility | EVAL_PLAN §4 #2 | _pending_ | |
+| 3 Egalitarian (women pastors dealbreaker) | EVAL_PLAN §4 #3 | _pending_ | |
+| Edge: crisis phrase in chat | expect 988 card | _pending_ | |
+| Edge: stated vs observed (women preach) | report rows | _pending_ | |

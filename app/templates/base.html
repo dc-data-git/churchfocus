@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title | default("Church Search") }}</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 48rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+    header { margin-bottom: 2rem; }
+    h1 { font-size: 1.75rem; margin: 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Church Search</h1>
+    <p>Find a church that fits — with evidence you can trust.</p>
+  </header>
+  <main>
+    {% block content %}
+    <p>Chat coming soon.</p>
+    {% endblock %}
+  </main>
+</body>
+</html>

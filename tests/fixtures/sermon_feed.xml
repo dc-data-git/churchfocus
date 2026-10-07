@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"
+     xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"
+     xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Fixture Church Sermons</title>
+    <link>https://fixture.church/sermons</link>
+    <item>
+      <title>Hope in Hard Times</title>
+      <pubDate>Sun, 22 Sep 2024 12:00:00 GMT</pubDate>
+      <dc:creator>Pastor John Smith</dc:creator>
+      <itunes:author>Pastor John Smith</itunes:author>
+      <enclosure url="https://fixture.church/audio/sermon-2024-09-22.mp3" type="audio/mpeg" length="12345678"/>
+      <description><![CDATA[Sunday morning message.]]></description>
+    </item>
+    <item>
+      <title>Walking by Faith</title>
+      <pubDate>Sun, 15 Sep 2024 12:00:00 GMT</pubDate>
+      <dc:creator>Rev. Jane Doe</dc:creator>
+      <itunes:author>Rev. Jane Doe</itunes:author>
+      <enclosure url="https://fixture.church/audio/sermon-2024-09-15.mp3" type="audio/mpeg" length="9876543"/>
+      <link>https://fixture.church/sermons/walking-by-faith</link>
+    </item>
+    <item>
+      <title>Guest Speaker: Grace Abounds</title>
+      <pubDate>Sun, 08 Sep 2024 12:00:00 GMT</pubDate>
+      <itunes:author>Guest Speaker Mark Lee</itunes:author>
+      <enclosure url="https://fixture.church/audio/sermon-2024-09-08.mp3" type="audio/mpeg" length="8765432"/>
+      <itunes:transcript url="https://fixture.church/transcripts/sermon-2024-09-08.txt"/>
+    </item>
+  </channel>
+</rss>

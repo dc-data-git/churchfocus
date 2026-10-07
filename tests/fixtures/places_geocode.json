@@ -1,0 +1,10 @@
+{
+  "places": [
+    {
+      "displayName": {"text": "Hesston, KS, USA"},
+      "formattedAddress": "Hesston, KS 67062, USA",
+      "location": {"latitude": 38.1383, "longitude": -97.4314},
+      "businessStatus": "OPERATIONAL"
+    }
+  ]
+}

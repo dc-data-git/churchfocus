@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Church Report — {{ report.church.name }}</title>
+  <style>
+    :root { --ink: #1a1a1a; --muted: #555; --border: #ddd; --accent: #2c5282; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+      max-width: 52rem;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+      line-height: 1.55;
+      background: #fff;
+    }
+    h1 { font-size: 1.75rem; margin: 0 0 0.25rem; }
+    h2 { font-size: 1.2rem; margin: 2rem 0 0.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.25rem; }
+    .meta { color: var(--muted); font-size: 0.95rem; margin-bottom: 1.5rem; }
+    .score { font-size: 1.1rem; font-weight: bold; color: var(--accent); }
+    .section p { margin: 0.5rem 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.92rem; margin: 0.75rem 0; }
+    th, td { border: 1px solid var(--border); padding: 0.5rem 0.65rem; text-align: left; vertical-align: top; }
+    th { background: #f7f7f7; }
+    .agrees-yes { color: #276749; }
+    .agrees-no { color: #9b2c2c; }
+    blockquote { margin: 0.25rem 0; padding-left: 0.75rem; border-left: 3px solid var(--border); font-style: italic; color: var(--muted); }
+    ul { margin: 0.5rem 0; padding-left: 1.25rem; }
+    .escalation { background: #fffbeb; border: 1px solid #f6e05e; padding: 0.75rem 1rem; margin: 0.75rem 0; border-radius: 4px; }
+    .tier { font-size: 0.8rem; color: var(--muted); }
+    footer { margin-top: 2.5rem; font-size: 0.85rem; color: var(--muted); }
+
+    @media print {
+      body { padding: 0; max-width: none; font-size: 11pt; }
+      h2 { page-break-after: avoid; }
+      table, tr, blockquote { page-break-inside: avoid; }
+      .no-print { display: none !important; }
+      a[href]::after { content: " (" attr(href) ")"; font-size: 0.8em; color: #666; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>{{ report.church.name }}</h1>
+    <p class="meta">
+      {{ report.church.address }}<br>
+      Generated {{ report.generated_at.strftime("%Y-%m-%d %H:%M UTC") if report.generated_at else "" }}
+      · Match score: <span class="score">{{ report.match.score }}</span>
+      {% if report.match.excluded %}<strong>(dealbreaker conflict)</strong>{% endif %}
+    </p>
+  </header>
+
+  {% if narrative.at_a_glance %}
+  <section class="section">
+    <h2>At a glance</h2>
+    <p>{{ narrative.at_a_glance }}</p>
+  </section>
+  {% endif %}
+
+  {% if narrative.how_it_fits %}
+  <section class="section">
+    <h2>How it fits what you asked for</h2>
+    <p>{{ narrative.how_it_fits }}</p>
+  </section>
+  {% elif report.match.why %}
+  <section class="section">
+    <h2>How it fits what you asked for</h2>
+    <ul>
+      {% for line in report.match.why %}
+      <li>{{ line }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if report.stated_vs_observed %}
+  <section class="section">
+    <h2>Stated vs observed</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Stated</th>
+          <th>Observed</th>
+          <th>Agrees?</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in report.stated_vs_observed %}
+        <tr>
+          <td>{{ row.label or feature_labels.get(row.feature, row.feature) }}</td>
+          <td>
+            {{ row.stated.value }}
+            {% if row.stated.quote %}<blockquote>"{{ row.stated.quote }}"</blockquote>{% endif %}
+            <div class="tier">tier {{ row.stated.tier }}</div>
+          </td>
+          <td>
+            {{ row.observed.value }}
+            {% if row.observed.note %}<div class="tier">{{ row.observed.note }}</div>{% endif %}
+            <div class="tier">tier {{ row.observed.tier }}</div>
+          </td>
+          <td class="{% if row.agrees %}agrees-yes{% elif row.agrees == false %}agrees-no{% endif %}">
+            {% if row.agrees %}Yes{% elif row.agrees == false %}No{% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  {% if report.escalations %}
+  <section class="section">
+    <h2>Notes for you</h2>
+    {% for esc in report.escalations %}
+    <div class="escalation">
+      <strong>{{ esc.reason.replace("_", " ") | title }}</strong>
+      <p>{{ esc.message }}</p>
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if report.open %}
+  <section class="section">
+    <h2>Still unknown</h2>
+    <ul>
+      {% for fid in report.open %}
+      <li>{{ feature_labels.get(fid, fid) }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if report.questions_for_visit %}
+  <section class="section">
+    <h2>Questions to ask on a visit</h2>
+    <ul>
+      {% for q in report.questions_for_visit %}
+      <li>{{ q }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if known_evidence %}
+  <section class="section">
+    <h2>Evidence collected</h2>
+    <table>
+      <thead>
+        <tr><th>Feature</th><th>Value</th><th>Tier</th><th>How</th><th>Quote / note</th></tr>
+      </thead>
+      <tbody>
+        {% for ev in known_evidence %}
+        <tr>
+          <td>{{ feature_labels.get(ev.feature, ev.feature) }}</td>
+          <td>{{ ev.value }}</td>
+          <td>{{ ev.tier }}</td>
+          <td>{{ ev.how }}</td>
+          <td>{% if ev.quote %}"{{ ev.quote }}"{% elif ev.note %}{{ ev.note }}{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  <footer>
+    <p>Church Search — evidence-based research report. Session {{ report.profile_session }}.</p>
+    <p class="no-print">Use your browser's Print → Save as PDF for a shareable copy.</p>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "places": [
+    {
+      "id": "ChIJ006_first_baptist",
+      "displayName": {"text": "First Baptist Church", "languageCode": "en"},
+      "formattedAddress": "120 N Main St, Newton, KS 67114, USA",
+      "location": {"latitude": 38.0470, "longitude": -97.3450},
+      "websiteUri": "https://firstbaptist-newton.example.org",
+      "businessStatus": "OPERATIONAL",
+      "types": ["church", "place_of_worship", "point_of_interest", "establishment"]
+    },
+    {
+      "id": "ChIJ007_non_denom_community",
+      "displayName": {"text": "Community Church of Hesston", "languageCode": "en"},
+      "formattedAddress": "88 Community Dr, Hesston, KS 67062, USA",
+      "location": {"latitude": 38.1395, "longitude": -97.4330},
+      "websiteUri": "https://community-nondenominational.example.org",
+      "businessStatus": "OPERATIONAL",
+      "types": ["church", "place_of_worship", "point_of_interest", "establishment"]
+    }
+  ]
+}

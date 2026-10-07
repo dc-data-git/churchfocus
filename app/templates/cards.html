@@ -1,0 +1,138 @@
+{# Fragment for HTMX swap or standalone include — no base extend #}
+<style>
+  .card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; }
+  .tier { display: inline-block; font-size: 0.75rem; padding: 0.1rem 0.4rem; border-radius: 0.25rem; background: #e2e8f0; }
+  .tier-A { background: #bbf7d0; }
+  .tier-B { background: #bfdbfe; }
+  .tier-C { background: #fde68a; }
+  .tier-D { background: #e9d5ff; }
+  .rating-strong { color: #15803d; font-weight: 600; }
+  .rating-possible { color: #a16207; font-weight: 600; }
+  .rating-weak { color: #b91c1c; font-weight: 600; }
+  .deep-pick { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; }
+  .deep-pick button { padding: 0.55rem 1rem; border: none; border-radius: 0.5rem; background: #1d4ed8; color: #fff; cursor: pointer; }
+  .deep-pick button:disabled { background: #94a3b8; }
+  #deep-jobs { margin-top: 1rem; font-size: 0.95rem; }
+  #deep-jobs a { color: #1d4ed8; }
+</style>
+
+<h2>Medium search results</h2>
+<p>Evidence tiers: A = church's own words, B = independent source, C = third-party signal, D = inferred. Pick up to 3 for a deep dive.</p>
+
+{% for card in cards %}
+<article class="card" data-church-id="{{ card.church.church_id }}">
+  <label style="display:flex;gap:0.5rem;align-items:flex-start;">
+    <input type="checkbox" class="deep-check" value="{{ card.church.church_id }}" onchange="updateDeepPick()">
+    <span>
+      <h3 style="margin:0;">{{ card.church.name }}</h3>
+      {% if card.church.address %}
+      <p>{{ card.church.address }}</p>
+      {% endif %}
+    </span>
+  </label>
+  {% if card.match is defined and card.match %}
+  <p><strong>Match score:</strong> {{ card.match.score }}%
+    {% if card.match.excluded %}<span style="color: #b00;"> — excluded</span>{% endif %}
+  </p>
+  {% endif %}
+
+  <p>
+    <strong>Deep dive candidate:</strong>
+    <span class="rating rating-{{ card.deep_dive_candidate }}">{{ card.deep_dive_candidate | capitalize }}</span>
+    — {{ card.reason }}
+  </p>
+
+  <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+    <div>
+      <h4>Settled</h4>
+      {% if card.settled %}
+      <ul>{% for fid in card.settled %}<li>{{ fid }}</li>{% endfor %}</ul>
+      {% else %}<p><em>None yet</em></p>{% endif %}
+    </div>
+    <div>
+      <h4>Open</h4>
+      {% if card.open %}
+      <ul>{% for fid in card.open %}<li>{{ fid }}</li>{% endfor %}</ul>
+      {% else %}<p><em>All checked features settled</em></p>{% endif %}
+    </div>
+  </div>
+
+  {% if card.evidence %}
+  <h4>New evidence (Stage 2)</h4>
+  <ul>
+    {% for ev in card.evidence %}
+    <li>
+      <strong>{{ ev.feature }}</strong> = {{ ev.value }}
+      <span class="tier tier-{{ ev.tier }}">tier {{ ev.tier }}</span>
+      {% if ev.quote %}<br><q>{{ ev.quote }}</q>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</article>
+{% else %}
+<p>No cards yet.</p>
+{% endfor %}
+
+{% if cards %}
+<div class="deep-pick">
+  <button type="button" id="deep-btn" disabled onclick="startDeepDive()">Start deep dive (1–3)</button>
+  <div id="deep-jobs"></div>
+</div>
+<script>
+(function () {
+  const sessionId = {{ (session_id | default('')) | tojson }};
+  window.updateDeepPick = function () {
+    const n = document.querySelectorAll('.deep-check:checked').length;
+    const btn = document.getElementById('deep-btn');
+    btn.disabled = n < 1 || n > 3;
+    btn.textContent = n ? ('Start deep dive (' + n + ')') : 'Start deep dive (1–3)';
+  };
+  window.startDeepDive = function () {
+    const ids = Array.from(document.querySelectorAll('.deep-check:checked')).map(function (el) { return el.value; });
+    const box = document.getElementById('deep-jobs');
+    const btn = document.getElementById('deep-btn');
+    btn.disabled = true;
+    box.textContent = 'Starting deep research…';
+    fetch('/api/deep', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      body: JSON.stringify({session_id: sessionId, church_ids: ids})
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      const jobs = data.job_ids || [];
+      if (!jobs.length) {
+        box.textContent = 'No jobs started (church session data missing — re-run search).';
+        return;
+      }
+      box.innerHTML = jobs.map(function (id) {
+        return '<div data-job="' + id + '">Job ' + id.slice(0, 8) + '… <span class="st">running</span></div>';
+      }).join('');
+      jobs.forEach(pollJob);
+    })
+    .catch(function () { box.textContent = 'Deep dive failed to start.'; });
+  };
+  function pollJob(jobId) {
+    const tick = function () {
+      fetch('/api/jobs/' + jobId)
+        .then(function (r) { return r.json(); })
+        .then(function (job) {
+          const el = document.querySelector('[data-job="' + jobId + '"] .st');
+          if (!el) return;
+          const st = job.status || 'unknown';
+          el.textContent = st + (job.progress != null ? ' (' + Math.round(job.progress) + '%)' : '');
+          if (job.report_url) {
+            el.innerHTML = st + ' — <a href="' + job.report_url + '" target="_blank" rel="noopener">Open report</a>';
+            return;
+          }
+          if (st === 'complete' || st === 'done' || st === 'error' || st === 'failed') return;
+          setTimeout(tick, 2000);
+        })
+        .catch(function () { setTimeout(tick, 3000); });
+    };
+    tick();
+  }
+})();
+</script>
+{% endif %}

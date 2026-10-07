@@ -1,0 +1,4 @@
+{"site": "grace_baptist", "url": "https://grace-baptist.fixture/", "feature": "lgbtq.marriage", "expected_value": "traditional", "expected_tier": "A"}
+{"site": "grace_baptist", "url": "https://grace-baptist.fixture/", "feature": "women.senior_pastor", "expected_value": "no", "expected_tier": "A"}
+{"site": "hope_community", "url": "https://hope-community.fixture/", "feature": "lgbtq.marriage", "expected_value": "traditional", "expected_tier": "A"}
+{"site": "hope_community", "url": "https://hope-community.fixture/", "feature": "community.kids", "expected_value": null, "note": "label when human audit lands"}

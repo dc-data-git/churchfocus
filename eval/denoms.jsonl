@@ -1,0 +1,30 @@
+{"name": "First Baptist Church Hesston", "city": "Hesston, KS", "website": null, "expected_id": "sbc", "expected_family": "baptist", "region": "Hesston/Wichita", "kind": "denominational", "secret": false}
+{"name": "Trinity Lutheran Church", "city": "Wichita, KS", "website": null, "expected_id": "elca", "expected_family": "lutheran", "region": "Hesston/Wichita", "kind": "denominational", "secret": false}
+{"name": "First Mennonite Church", "city": "Hesston, KS", "website": null, "expected_id": "mcusa", "expected_family": "mennonite", "region": "Hesston/Wichita", "kind": "denominational", "secret": false}
+{"name": "Assemblies of God Worship Center", "city": "Wichita, KS", "website": null, "expected_id": "ag", "expected_family": "pentecostal", "region": "Hesston/Wichita", "kind": "denominational", "secret": false}
+{"name": "St. Mary Catholic Church", "city": "Newton, KS", "website": null, "expected_id": "catholic", "expected_family": "catholic", "region": "Hesston/Wichita", "kind": "denominational", "secret": false}
+{"name": "SBC of Hesston", "city": "Hesston, KS", "website": null, "expected_id": "sbc", "expected_family": "baptist", "region": "Hesston/Wichita", "kind": "abbrev", "secret": false}
+{"name": "ELCA Faith Community", "city": "Wichita, KS", "website": null, "expected_id": "elca", "expected_family": "lutheran", "region": "Hesston/Wichita", "kind": "abbrev", "secret": false}
+{"name": "Hope Community Church", "city": "Wichita, KS", "website": "https://hope-community.fixture/", "expected_id": null, "expected_label": "Non-denominational", "region": "Hesston/Wichita", "kind": "nondenom", "secret": false}
+{"name": "The Crossing", "city": "Wichita, KS", "website": null, "expected_id": null, "expected_label": "Unknown", "region": "Hesston/Wichita", "kind": "nondenom", "secret": false}
+{"name": "New Life Fellowship", "city": "Wichita, KS", "website": null, "expected_id": null, "expected_label": "Unknown", "region": "Hesston/Wichita", "kind": "nondenom", "secret": false}
+{"name": "Citylight Church", "city": "Kansas City, MO", "website": null, "expected_id": null, "expected_label": "Unknown", "region": "Kansas City", "kind": "nondenom", "secret": false}
+{"name": "Rivers Edge Church", "city": "Kansas City, MO", "website": null, "expected_id": null, "expected_label": "Unknown", "region": "Kansas City", "kind": "nondenom", "secret": false}
+{"name": "Grace Point", "city": "Overland Park, KS", "website": null, "expected_id": "sbc", "expected_family": "baptist", "region": "Kansas City", "kind": "secret", "secret": true, "hint": "pastor trained at Southern Seminary; network Acts 29"}
+{"name": "Redeemer Fellowship", "city": "Kansas City, MO", "website": null, "expected_id": "sbc", "expected_family": "baptist", "region": "Kansas City", "kind": "secret", "secret": true}
+{"name": "Christ Church Anglican", "city": "Overland Park, KS", "website": null, "expected_id": null, "expected_family": "anglican", "region": "Kansas City", "kind": "secret", "secret": true}
+{"name": "Second Baptist Church", "city": "Houston, TX", "website": null, "expected_id": "sbc", "expected_family": "baptist", "region": "Houston", "kind": "denominational", "secret": false}
+{"name": "Christ the King Lutheran", "city": "Houston, TX", "website": null, "expected_id": "elca", "expected_family": "lutheran", "region": "Houston", "kind": "denominational", "secret": false}
+{"name": "Lakewood Church", "city": "Houston, TX", "website": null, "expected_id": null, "expected_label": "Non-denominational", "region": "Houston", "kind": "nondenom", "secret": false}
+{"name": "Co-Cathedral of the Sacred Heart", "city": "Houston, TX", "website": null, "expected_id": "catholic", "expected_family": "catholic", "region": "Houston", "kind": "denominational", "secret": false}
+{"name": "First Assembly of God", "city": "Houston, TX", "website": null, "expected_id": "ag", "expected_family": "pentecostal", "region": "Houston", "kind": "denominational", "secret": false}
+{"name": "Mennonite Church of Houston", "city": "Houston, TX", "website": null, "expected_id": "mcusa", "expected_family": "mennonite", "region": "Houston", "kind": "denominational", "secret": false}
+{"name": "The Porch", "city": "Dallas, TX", "website": null, "expected_id": null, "expected_label": "Unknown", "region": "Houston", "kind": "nondenom", "secret": false}
+{"name": "Vintage Church", "city": "New Orleans, LA", "website": null, "expected_id": "sbc", "expected_family": "baptist", "region": "Gulf South", "kind": "secret", "secret": true}
+{"name": "Bethel Community Church", "city": "Wichita, KS", "website": null, "expected_id": null, "expected_label": "Unknown", "region": "Hesston/Wichita", "kind": "nondenom", "secret": false}
+{"name": "Holy Spirit Catholic Parish", "city": "Wichita, KS", "website": null, "expected_id": "catholic", "expected_family": "catholic", "region": "Hesston/Wichita", "kind": "denominational", "secret": false}
+{"name": "Faith Lutheran Church", "city": "Newton, KS", "website": null, "expected_id": "elca", "expected_family": "lutheran", "region": "Hesston/Wichita", "kind": "denominational", "secret": false}
+{"name": "Central Christian Church", "city": "Wichita, KS", "website": null, "expected_id": null, "expected_label": "Unknown", "region": "Hesston/Wichita", "kind": "nondenom", "secret": false}
+{"name": "Journey Church", "city": "Andover, KS", "website": null, "expected_id": null, "expected_label": "Unknown", "region": "Hesston/Wichita", "kind": "nondenom", "secret": false}
+{"name": "Wheatland Mennonite", "city": "Hesston, KS", "website": null, "expected_id": "mcusa", "expected_family": "mennonite", "region": "Hesston/Wichita", "kind": "denominational", "secret": false}
+{"name": "Passion City Church", "city": "Atlanta, GA", "website": null, "expected_id": null, "expected_label": "Unknown", "region": "Atlanta", "kind": "nondenom", "secret": false}

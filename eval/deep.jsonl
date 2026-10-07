@@ -1,0 +1,2 @@
+{"church_id": "fixture-grace", "feature": "lgbtq.marriage", "stated": "traditional", "observed": null, "audit": "pending_human"}
+{"church_id": "fixture-grace", "feature": "women.preach", "stated": null, "observed": "occasionally", "audit": "pending_human", "note": "from sermon aggregate tests"}

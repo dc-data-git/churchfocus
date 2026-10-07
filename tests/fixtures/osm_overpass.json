@@ -1,0 +1,35 @@
+{
+  "elements": [
+    {
+      "type": "node",
+      "id": 10001,
+      "lat": 38.1390,
+      "lon": -97.4310,
+      "tags": {
+        "amenity": "place_of_worship",
+        "religion": "christian",
+        "denomination": "Mennonite",
+        "name": "Prairie Mennonite Church",
+        "addr:street": "W Prairie Rd",
+        "addr:city": "Hesston",
+        "addr:state": "KS",
+        "website": "https://prairiemennonite.example.org"
+      }
+    },
+    {
+      "type": "way",
+      "id": 20002,
+      "center": {"lat": 38.1410, "lon": -97.4290},
+      "tags": {
+        "amenity": "place_of_worship",
+        "religion": "christian",
+        "denomination": "Southern Baptist",
+        "name": "Calvary Baptist Church",
+        "addr:housenumber": "500",
+        "addr:street": "E 27th St",
+        "addr:city": "Hesston",
+        "addr:state": "KS"
+      }
+    }
+  ]
+}

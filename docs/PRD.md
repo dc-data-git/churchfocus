@@ -112,6 +112,7 @@ An interactive church finder that **does not maintain a database of churches**. 
 | D20 | Matching is deterministic and explainable; models only extract evidence and phrase questions. (Dev default.) |
 | D21 | Red-team fixes (features.v3): women ladder records minimum and/or maximum; ladder splits pastors vs elders; marriage and LGBTQ membership/leadership asked as two parallel questions; `community.young_adults` added; deep-search self-correction (quote re-check) made explicit. |
 | D22 | Sermon cap = 25 per church (supersedes the open limit in D9). Deep-search budgets raised to 120 min / 150 tool calls to fit it. |
+| D23 | Denomination KB accuracy 77% (audit round 3, n=30) accepted for the demo; impact bounded by prior-only use + sensitive-field human gate; improvement plan in eval/denomkb_audit.md (tracked as Q1). |
 
 ## 8. Open questions
 - Q1 Burden validation quote (HUMAN, Daniel).

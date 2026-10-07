@@ -1,0 +1,51 @@
+{
+  "places": [
+    {
+      "id": "ChIJ001_first_mennonite",
+      "displayName": {"text": "First Mennonite Church", "languageCode": "en"},
+      "formattedAddress": "101 E Smith St, Hesston, KS 67062, USA",
+      "location": {"latitude": 38.1389, "longitude": -97.4312},
+      "websiteUri": "https://firstmennonite-hesston.example.org",
+      "nationalPhoneNumber": "+1 620-327-4100",
+      "businessStatus": "OPERATIONAL",
+      "types": ["church", "place_of_worship", "point_of_interest", "establishment"]
+    },
+    {
+      "id": "ChIJ002_grace_community",
+      "displayName": {"text": "Grace Community Church", "languageCode": "en"},
+      "formattedAddress": "2200 N Main St, Hesston, KS 67062, USA",
+      "location": {"latitude": 38.1450, "longitude": -97.4280},
+      "websiteUri": "https://gracecommunity-hesston.example.org",
+      "nationalPhoneNumber": "+1 620-327-2200",
+      "businessStatus": "OPERATIONAL",
+      "types": ["church", "place_of_worship", "point_of_interest", "establishment"]
+    },
+    {
+      "id": "ChIJ003_holy_cross_catholic",
+      "displayName": {"text": "Holy Cross Catholic Church", "languageCode": "en"},
+      "formattedAddress": "300 E Lincoln Blvd, Hesston, KS 67062, USA",
+      "location": {"latitude": 38.1370, "longitude": -97.4295},
+      "websiteUri": "https://holycross-hesston.example.org",
+      "businessStatus": "OPERATIONAL",
+      "types": ["church", "place_of_worship", "point_of_interest", "establishment"]
+    },
+    {
+      "id": "ChIJ004_closed_chapel",
+      "displayName": {"text": "Closed Chapel", "languageCode": "en"},
+      "formattedAddress": "999 Closed Rd, Hesston, KS 67062, USA",
+      "location": {"latitude": 38.1400, "longitude": -97.4350},
+      "businessStatus": "CLOSED_PERMANENTLY",
+      "types": ["church", "place_of_worship"]
+    },
+    {
+      "id": "ChIJ005_independent_fellowship",
+      "displayName": {"text": "Independent Bible Fellowship", "languageCode": "en"},
+      "formattedAddress": "450 W Hickory St, Hesston, KS 67062, USA",
+      "location": {"latitude": 38.1365, "longitude": -97.4380},
+      "websiteUri": "https://independentfellowship.example.org",
+      "businessStatus": "OPERATIONAL",
+      "types": ["church", "place_of_worship", "point_of_interest", "establishment"]
+    }
+  ],
+  "nextPageToken": "page2token"
+}
