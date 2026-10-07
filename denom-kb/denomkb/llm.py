@@ -129,7 +129,7 @@ class LLM:
 
         k = self._key("chat", model, messages, schema)
         cached = self._get(k)
-        if cached is not None:
+        if cached is not None and cached["value"] is not None:   # failed calls are retried, not replayed
             return cached["value"]
 
         msgs = list(messages)
