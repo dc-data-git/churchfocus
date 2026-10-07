@@ -1,0 +1,94 @@
+# YouTube channels for the christianese-lexicon corpus (the user's priority list, 2026-10-07).
+#
+# tradition / family / kind: same meaning as in podcasts.yaml, so YouTube and podcast sources
+#   in one tradition are balanced together.
+# denomination: finer label (use --label denomination to compare at this level).
+# url: the channel tab to sample from (/videos, or /streams for churches that only livestream).
+# Transcripts: youtube-transcript-api first (YouTube's own captions), Whisper as the fallback.
+
+channels:
+  # ---------------- Catholic ----------------
+  - {name: "Bishop Robert Barron (YouTube)", tradition: catholic, denomination: catholic, family: catholic, kind: official,
+     url: "https://www.youtube.com/channel/UCcMjLgeWNwqL2LBGS-iPb1A/videos"}
+  - {name: "Ascension Presents (YouTube)", tradition: catholic, denomination: catholic, family: catholic, kind: official,
+     url: "https://www.youtube.com/channel/UCVdGX3N-WIJ5nUvklBTNhAw/videos"}
+  - {name: "Pints With Aquinas / Matt Fradd (YouTube)", tradition: catholic, denomination: catholic, family: catholic, kind: influencer,
+     url: "https://www.youtube.com/channel/UClh4JeqYB1QN6f1h_bzmEng/videos"}
+
+  # ---------------- Orthodox ----------------
+  - {name: "Ancient Faith (YouTube)", tradition: orthodox, denomination: orthodox, family: orthodox, kind: official,
+     url: "https://www.youtube.com/channel/UCOA_vxLRZ3-PWpFBdHR-AyA/videos"}
+  - {name: "Jonathan Pageau (YouTube)", tradition: orthodox, denomination: orthodox, family: orthodox, kind: influencer,
+     url: "https://www.youtube.com/channel/UCtCTSf3UwRU14nYWr_xm-dQ/videos"}
+  - {name: "Patristic Nectar (YouTube)", tradition: orthodox, denomination: orthodox, family: orthodox, kind: official,
+     url: "https://www.youtube.com/channel/UCz72pwrQRTXibU14NmHep8w/videos"}
+
+  # ---------------- Episcopal ----------------
+  - {name: "Washington National Cathedral (YouTube)", tradition: anglican_episcopal, denomination: episcopal, family: mainline, kind: church,
+     url: "https://www.youtube.com/channel/UClf3eF-DScY5hn4YbTOEdcg/videos"}
+  - {name: "The Episcopal Church (YouTube)", tradition: anglican_episcopal, denomination: episcopal, family: mainline, kind: official,
+     url: "https://www.youtube.com/channel/UCdVJpxCtK41c_-p6EaE4_2A/videos"}
+  - {name: "Grace Cathedral San Francisco (YouTube)", tradition: anglican_episcopal, denomination: episcopal, family: mainline, kind: church,
+     url: "https://www.youtube.com/channel/UCppkHBw8pvEUZuR6U5XS31A/videos"}
+
+  # ---------------- ELCA ----------------
+  - {name: "ELCA (YouTube)", tradition: lutheran, denomination: elca, family: mainline, kind: official,
+     url: "https://www.youtube.com/channel/UCVuoGj_35M5Bb9p5pjU2-Qw/videos"}
+  - {name: "Faith+Lead (YouTube)", tradition: lutheran, denomination: elca, family: mainline, kind: official,
+     url: "https://www.youtube.com/channel/UCAeXr8Dsf9VBJP-Lb7ApiuA/videos"}
+  - {name: "Luther Seminary (YouTube)", tradition: lutheran, denomination: elca, family: mainline, kind: official,
+     url: "https://www.youtube.com/channel/UCVgLRh4bsnz2xWvBWTkucYA/videos"}
+  - {name: "Nadia Bolz-Weber (YouTube)", tradition: lutheran, denomination: elca, family: mainline, kind: influencer,
+     url: "https://www.youtube.com/channel/UCFoRON1KnXKudJrnln9goFQ/videos"}
+
+  # ---------------- PC(USA) ----------------
+  - {name: "Presbyterian Church (U.S.A.) (YouTube)", tradition: presbyterian_reformed, denomination: pcusa, family: mainline, kind: official,
+     url: "https://www.youtube.com/channel/UCk2pAxSIUs5x5aaop7JNAlQ/videos"}
+  - {name: "Fifth Avenue Presbyterian Church (YouTube)", tradition: presbyterian_reformed, denomination: pcusa, family: mainline, kind: church,
+     url: "https://www.youtube.com/channel/UCRtg03C8Bv7dBwWge51_DXg/videos"}
+  - {name: "Myers Park Presbyterian Church (YouTube)", tradition: presbyterian_reformed, denomination: pcusa, family: mainline, kind: church,
+     url: "https://www.youtube.com/channel/UCAO9oulFCi17YG9m7HaU8PQ/videos"}
+
+  # ---------------- SBC ----------------
+  - {name: "First Baptist Dallas (YouTube)", tradition: baptist, denomination: sbc, family: evangelical, kind: church,
+     url: "https://www.youtube.com/channel/UCoifM1VPrNtxh5DCIANaxJA/videos"}
+  - {name: "The Summit Church (YouTube)", tradition: baptist, denomination: sbc, family: evangelical, kind: church,
+     url: "https://www.youtube.com/channel/UCx7WRqooyQ52pnvd6TH8Nug/videos"}
+  - {name: "J.D. Greear (YouTube)", tradition: baptist, denomination: sbc, family: evangelical, kind: influencer,
+     url: "https://www.youtube.com/channel/UCgxKUVSKpYrnkqqESFrBzAQ/videos"}
+  - {name: "Albert Mohler (YouTube)", tradition: baptist, denomination: sbc, family: evangelical, kind: official,
+     url: "https://www.youtube.com/channel/UCzH05TIlVgb3fNFMb10LYvg/videos"}
+
+  # ---------------- Mennonite Church USA ----------------
+  - {name: "Mennonite Church USA (YouTube)", tradition: anabaptist, denomination: mcusa, family: anabaptist, kind: official,
+     url: "https://www.youtube.com/channel/UCMXDhVwGJ1-k6Y3emeCFU2g/videos"}
+  - {name: "Park View Mennonite Church (YouTube)", tradition: anabaptist, denomination: mcusa, family: anabaptist, kind: church,
+     url: "https://www.youtube.com/channel/UCi_Y5MIfVQ_3Zb4ClJiNH2w/videos"}
+  - {name: "College Mennonite Church (YouTube)", tradition: anabaptist, denomination: mcusa, family: anabaptist, kind: church,
+     url: "https://www.youtube.com/channel/UCaghUN6q-gpsQlnL-Pe9tTA/videos"}
+
+  # ---------------- Church of the Nazarene ----------------
+  # No official denominational channel could be found (nazarene.org links none); two College
+  # Churches stand in: Bourbonnais, IL (livestreams) and Olathe, KS.
+  - {name: "Bethany First Church of the Nazarene (YouTube)", tradition: methodist_wesleyan, denomination: nazarene, family: evangelical, kind: church,
+     url: "https://www.youtube.com/channel/UCxk8TjnzoxEwpc3ZIvdp-5w/videos"}
+  - {name: "College Church of the Nazarene, Bourbonnais (YouTube)", tradition: methodist_wesleyan, denomination: nazarene, family: evangelical, kind: church,
+     url: "https://www.youtube.com/channel/UCj8vhOun_FtHKN_Uv3vlwEQ/streams"}
+  - {name: "College Church, Olathe (YouTube)", tradition: methodist_wesleyan, denomination: nazarene, family: evangelical, kind: church,
+     url: "https://www.youtube.com/channel/UCkIheBwrdNbX_tfGOGdkZBg/videos"}
+
+  # ---------------- Assemblies of God ----------------
+  - {name: "James River Church (YouTube)", tradition: pentecostal_charismatic, denomination: ag, family: evangelical, kind: church,
+     url: "https://www.youtube.com/channel/UCKnbcRCM-pLgWlg5RU0CprQ/videos"}
+  - {name: "National Community Church (YouTube)", tradition: pentecostal_charismatic, denomination: ag, family: evangelical, kind: church,
+     url: "https://www.youtube.com/channel/UCe8VIb34M6NniGA8GHRoWQw/videos"}
+  - {name: "Assemblies of God USA (YouTube)", tradition: pentecostal_charismatic, denomination: ag, family: evangelical, kind: official,
+     url: "https://www.youtube.com/channel/UCfc4Q7JVg5IIE7MnteVpu4g/videos"}
+
+  # ---------------- Churches of Christ ----------------
+  - {name: "The Gospel of Christ (YouTube)", tradition: churches_of_christ, denomination: coc, family: restorationist, kind: official,
+     url: "https://www.youtube.com/channel/UCqri7oU62B9x7SnvniQdyhw/videos"}
+  - {name: "World Video Bible School (YouTube)", tradition: churches_of_christ, denomination: coc, family: restorationist, kind: official,
+     url: "https://www.youtube.com/channel/UCGxfHBfP4ZBpg4TDg8v8G3A/videos"}
+  - {name: "Gospel Broadcasting Network (YouTube)", tradition: churches_of_christ, denomination: coc, family: restorationist, kind: official,
+     url: "https://www.youtube.com/channel/UCZ79pHe1jmLMuxc_VElGjfg/videos"}

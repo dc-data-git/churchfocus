@@ -1,0 +1,79 @@
+[
+  {
+    "task": "dimension_name",
+    "model": "qwen2.5:14b",
+    "calls": 14,
+    "ok_rate": 1.0,
+    "median_ms": 1231,
+    "total_min": 0.3,
+    "repairs": 0,
+    "prompt_tokens": 6284,
+    "completion_tokens": 540
+  },
+  {
+    "task": "doctor",
+    "model": "qwen2.5:14b",
+    "calls": 1,
+    "ok_rate": 1.0,
+    "median_ms": 7045,
+    "total_min": 0.1,
+    "repairs": 0,
+    "prompt_tokens": 35,
+    "completion_tokens": 6
+  },
+  {
+    "task": "doctor",
+    "model": "qwen2.5:7b",
+    "calls": 1,
+    "ok_rate": 1.0,
+    "median_ms": 4788,
+    "total_min": 0.1,
+    "repairs": 0,
+    "prompt_tokens": 35,
+    "completion_tokens": 6
+  },
+  {
+    "task": "draft",
+    "model": "qwen2.5:14b",
+    "calls": 490,
+    "ok_rate": 0.996,
+    "median_ms": 7700,
+    "total_min": 85.2,
+    "repairs": 54,
+    "prompt_tokens": 1094564,
+    "completion_tokens": 199373
+  },
+  {
+    "task": "embed",
+    "model": "nomic-embed-text",
+    "calls": 980,
+    "ok_rate": 1.0,
+    "median_ms": 127,
+    "total_min": 2.3,
+    "repairs": 0,
+    "prompt_tokens": 0,
+    "completion_tokens": 0
+  },
+  {
+    "task": "seeker_extract",
+    "model": "qwen2.5:7b",
+    "calls": 47,
+    "ok_rate": 1.0,
+    "median_ms": 147,
+    "total_min": 0.5,
+    "repairs": 0,
+    "prompt_tokens": 8504,
+    "completion_tokens": 417
+  },
+  {
+    "task": "stance",
+    "model": "qwen2.5:7b",
+    "calls": 725,
+    "ok_rate": 0.959,
+    "median_ms": 3721,
+    "total_min": 41.6,
+    "repairs": 322,
+    "prompt_tokens": 706001,
+    "completion_tokens": 185727
+  }
+]

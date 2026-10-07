@@ -55,12 +55,15 @@ def run(ctx: Ctx) -> dict:
     max_ref = sc.get("max_ref_freq", 1.5e-4)
     ratio = sc.get("subsume_ratio", 0.8)
     generic = set(read_list(ctx.path("generic_terms"))) if "generic_terms" in ctx.cfg else set()
+    if ctx.cfg.get("filler_terms"):  # spoken filler and podcast/video boilerplate (transcribed corpora)
+        generic |= set(read_list(ctx.path("filler_terms")))
     cands = {c["term"]: c for c in read_jsonl(ctx.work / "02_counts" / "candidates.jsonl")}
     key = {k["term"]: k for k in read_jsonl(ctx.work / "04_keyness" / "keyness.jsonl")}
     phrases = read_json(ctx.work / "03_seeker" / "phrases.json")
     subsumed = subsumed_terms(cands, ratio)
 
-    excluded = {"generic": 0, "common_english": 0, "subsumed": 0}
+    excluded = {"generic": 0, "common_english": 0, "subsumed": 0, "one_source": 0}
+    max_share = ctx.cfg["counts"].get("max_source_share", 1.0)
 
     def eligible(t: str) -> bool:
         if cands.get(t, {}).get("seed"):
@@ -73,6 +76,9 @@ def run(ctx: Ctx) -> dict:
             return False
         if t in subsumed:
             excluded["subsumed"] += 1
+            return False
+        if cands[t].get("top_source_share", 0) > max_share:  # one show's topic or catchphrase
+            excluded["one_source"] += 1
             return False
         return True
 

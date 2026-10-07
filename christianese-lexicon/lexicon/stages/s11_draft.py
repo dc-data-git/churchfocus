@@ -63,6 +63,11 @@ def make_check(features: dict):
                 fid = f["feature"]
                 if fid not in known and not fid.startswith("proposed."):
                     errs.append(f"unknown feature id '{fid}' (use the vocabulary or 'proposed.<id>')")
+        max_f = 6
+        for s_ in v["senses"]:
+            if len(s_["features"]) > max_f:
+                errs.append(f"sense '{s_['gloss'][:40]}' lists {len(s_['features'])} features; list only the "
+                            f"features this term actually implies (at most {max_f})")
         types = set(v["term_types"])
         if "polysemous" in types and len(v["senses"]) < 2:
             errs.append("term_types includes polysemous but only one sense was given")
@@ -103,7 +108,13 @@ def run(ctx: Ctx) -> dict:
     features = load_features(ctx)
     schema = read_json(ctx.path("schema"))
     ctxs = {r["term"]: r["contexts"] for r in read_jsonl(ctx.work / "06_contexts" / "contexts.jsonl")}
-    ranked = list(read_jsonl(ctx.work / "10_rank" / "ranked.jsonl"))[:top_n]
+    all_ranked = list(read_jsonl(ctx.work / "10_rank" / "ranked.jsonl"))
+    ranked = all_ranked[:top_n]
+    # seed terms are the vocabulary the team already knows matters: draft every one the corpus
+    # actually uses, even when it ranks below top_n
+    min_seed = ctx.cfg["draft"].get("seed_min_count", 3)
+    have = {r["term"] for r in ranked}
+    ranked += [r for r in all_ranked[top_n:] if r.get("seed") and r["count"] >= min_seed and r["term"] not in have]
     system = prompts.DRAFT_SYSTEM + "\n\nFEATURE VOCABULARY:\n" + feature_block(features)
     check = make_check(features)
     model = ctx.cfg["llm"]["chat_model"]

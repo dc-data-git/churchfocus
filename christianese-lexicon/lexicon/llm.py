@@ -87,9 +87,18 @@ class LLM:
 
     def _chat_raw(self, model: str, messages: list[dict], schema: dict) -> tuple[str, int, int]:
         if self.provider == "ollama":
+            num_ctx = self.cfg.get("num_ctx", 8192)
+            num_predict = self.cfg.get("num_predict", 2048)
+            # Ollama silently drops the start of a prompt that doesn't fit, so check first.
+            # ~3 characters per token is a conservative estimate for English text.
+            est = sum(len(m["content"]) for m in messages) // 3 + 50
+            if est + num_predict > num_ctx:
+                log.warning("prompt ~%d tokens + %d output may exceed num_ctx=%d (model %s); raise llm.num_ctx",
+                            est, num_predict, num_ctx, model)
             payload = {
                 "model": model, "messages": messages, "stream": False, "format": schema,
-                "options": {"temperature": self.cfg.get("temperature", 0), "num_ctx": self.cfg.get("num_ctx", 8192)},
+                "options": {"temperature": self.cfg.get("temperature", 0), "num_ctx": num_ctx,
+                            "num_predict": num_predict},
             }
             d = self._post("/api/chat", payload)
             return d["message"]["content"], d.get("prompt_eval_count", 0), d.get("eval_count", 0)
@@ -172,7 +181,8 @@ class LLM:
             chunk = [texts[i] for i in idx]
             t0 = time.time()
             if self.provider == "ollama":
-                vecs = self._post("/api/embed", {"model": model, "input": chunk})["embeddings"]
+                vecs = self._post("/api/embed", {"model": model, "input": chunk,
+                                                 "options": {"num_ctx": self.cfg.get("embed_num_ctx", 2048)}})["embeddings"]
             else:
                 d = self._post("/v1/embeddings", {"model": model, "input": chunk})
                 vecs = [e["embedding"] for e in d["data"]]

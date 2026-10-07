@@ -1,0 +1,162 @@
+# Podcast sample for the christianese-lexicon corpus.
+#
+# tradition: the label written into the corpus (stage 04/07 compare these).
+# family:    a coarser grouping (use --label family to compare at this level instead).
+# kind:      official (a denomination, order, seminary or its ministry) | influencer
+#            (an individual / independent show) | church (a congregation's sermon feed)
+# Feeds were resolved via the Apple Podcasts directory on 2026-10-07. Set enabled: false
+# to drop a show without deleting it.
+
+shows:
+  # ---------------- Catholic ----------------
+  - {name: "The Bible in a Year (Fr. Mike Schmitz)", tradition: catholic, family: catholic, kind: official,
+     rss: "https://feeds.fireside.fm/bibleinayear/rss"}
+  - {name: "The Word on Fire Show (Bishop Barron)", tradition: catholic, family: catholic, kind: official,
+     rss: "https://rss.libsyn.com/shows/71279/destinations/302449.xml"}
+  - {name: "Pints With Aquinas", tradition: catholic, family: catholic, kind: influencer,
+     rss: "https://feeds.megaphone.fm/BVDWV3128780668"}
+  - {name: "Catholic Answers Live", tradition: catholic, family: catholic, kind: official,
+     rss: "http://feeds.feedburner.com/catholic/cal"}
+  - {name: "Jesuitical (America Media)", tradition: catholic, family: catholic, kind: official,
+     rss: "https://feeds.megaphone.fm/AMMD2442073612"}
+  - {name: "Pray As You Go", tradition: catholic, family: catholic, kind: official,
+     rss: "https://admin.prayasyougo.org/api/feed.xml"}
+  - {name: "The Catholic Talk Show", tradition: catholic, family: catholic, kind: influencer,
+     rss: "https://feeds.megaphone.fm/KM5671060902"}
+
+  # ---------------- Orthodox ----------------
+  - {name: "The Lord of Spirits", tradition: orthodox, family: orthodox, kind: official,
+     rss: "http://feeds.ancientfaith.com/TheLordOfSpirits/"}
+  - {name: "Ancient Faith Today Live", tradition: orthodox, family: orthodox, kind: official,
+     rss: "http://feeds.ancientfaith.com/AncientFaithTodayLive/"}
+  - {name: "Ancient Faith Today", tradition: orthodox, family: orthodox, kind: official,
+     rss: "https://feeds.ancientfaith.com/aftoday"}
+  - {name: "The Symbolic World (Jonathan Pageau)", tradition: orthodox, family: orthodox, kind: influencer,
+     rss: "https://anchor.fm/s/114dd2538/podcast/rss"}
+
+  # ---------------- Anglican / Episcopal ----------------
+  - {name: "Habits of Grace (Presiding Bishop Michael Curry)", tradition: anglican_episcopal, family: mainline, kind: official,
+     rss: "https://feeds.megaphone.fm/habits-of-grace"}
+  - {name: "The Living Church Podcast", tradition: anglican_episcopal, family: mainline, kind: official,
+     rss: "https://feeds.redcircle.com/2583ed91-dcdb-44c3-b2b1-13bff24fe10c"}
+  - {name: "And Also With You", tradition: anglican_episcopal, family: mainline, kind: influencer,
+     rss: "https://feeds.simplecast.com/2MOSOCPL"}
+  - {name: "All Saints Episcopal Church, Portland", tradition: anglican_episcopal, family: mainline, kind: church,
+     rss: "https://media.rss.com/allsaintspdx/feed.xml"}
+  - {name: "Things Anglican (ACNA)", tradition: anglican_episcopal, family: evangelical, kind: official,
+     rss: "https://podcasts.subsplash.com/zbg6n8n/podcast.rss"}
+  - {name: "AnglicanTV", tradition: anglican_episcopal, family: evangelical, kind: influencer,
+     rss: "https://feeds.simplecast.com/tf7bZIpV"}
+  - {name: "The Esau McCaulley Podcast", tradition: anglican_episcopal, family: evangelical, kind: influencer,
+     rss: "https://rss.libsyn.com/shows/548712/destinations/4733752.xml"}
+
+  # ---------------- Lutheran ----------------
+  - {name: "Sermon Brainwave (Working Preacher, Luther Seminary / ELCA)", tradition: lutheran, family: mainline, kind: official,
+     rss: "https://feeds.captivate.fm/sermon-brainwave-from-working-preacher/"}
+  - {name: "Issues, Etc. (LCMS)", tradition: lutheran, family: evangelical, kind: official,
+     rss: "https://issuesetc.org/feed/podcast/"}
+  - {name: "The Lutheran Witness Podcast (LCMS / KFUO)", tradition: lutheran, family: evangelical, kind: official,
+     rss: "https://kfuo-rss.streamguys1.com/lutheran-witness-podcast/lutheranwitness-itunes.xml"}
+
+  # ---------------- Methodist / Wesleyan / Holiness ----------------
+  - {name: "Get Your Spirit in Shape (United Methodist Communications)", tradition: methodist_wesleyan, family: mainline, kind: official,
+     rss: "https://podcast.umc.org/category/get-your-spirit-in-shape/feed/"}
+  - {name: "The Holiness Today Podcast (Church of the Nazarene)", tradition: methodist_wesleyan, family: evangelical, kind: official,
+     rss: "https://feed.podbean.com/holinesstoday/feed.xml"}
+  - {name: "Church of the Nazarene", tradition: methodist_wesleyan, family: evangelical, kind: official,
+     rss: "https://feeds.soundcloud.com/users/soundcloud:users:459961926/sounds.rss"}
+  - {name: "All Things Wesley (Wesleyan Covenant Association)", tradition: methodist_wesleyan, family: evangelical, kind: official,
+     rss: "https://rss.libsyn.com/shows/385457/destinations/3170021.xml", enabled: false}   # audio files return 404 (show ended 2022)
+
+  # ---------------- Presbyterian / Reformed ----------------
+  - {name: "A Matter of Faith: A Presby Podcast (PC(USA))", tradition: presbyterian_reformed, family: mainline, kind: official,
+     rss: "https://rss.buzzsprout.com/1648090.rss"}
+  - {name: "Things Not Seen (Calvin University / CRC)", tradition: presbyterian_reformed, family: evangelical, kind: official,
+     rss: "https://feeds.megaphone.fm/SM8626686718"}
+  - {name: "Renewing Your Mind (Ligonier)", tradition: presbyterian_reformed, family: evangelical, kind: official,
+     rss: "https://renewingyourmind.ligonier.org/rss"}
+  - {name: "Ask Pastor John (Desiring God)", tradition: presbyterian_reformed, family: evangelical, kind: influencer,
+     rss: "https://feed.desiringgod.org/ask-pastor-john.rss"}
+  - {name: "TGC Podcast (The Gospel Coalition)", tradition: presbyterian_reformed, family: evangelical, kind: official,
+     rss: "https://feeds.simplecast.com/96_xs9dX"}
+  - {name: "Truth Unites (Gavin Ortlund)", tradition: presbyterian_reformed, family: evangelical, kind: influencer,
+     rss: "https://anchor.fm/s/7378ad98/podcast/rss"}
+
+  # ---------------- Baptist ----------------
+  - {name: "The Briefing (Albert Mohler, SBTS)", tradition: baptist, family: evangelical, kind: official,
+     rss: "https://albertmohler.com/category/the-briefing/feed/"}
+  - {name: "ERLC Podcast (Southern Baptist Convention)", tradition: baptist, family: evangelical, kind: official,
+     rss: "https://rss.buzzsprout.com/2526883.rss"}
+  - {name: "Truth For Life (Alistair Begg)", tradition: baptist, family: evangelical, kind: influencer,
+     rss: "https://feeds.feedburner.com/truthforlife/alistairbeggdevotionalpodcast"}
+  - {name: "CBF Conversations (Cooperative Baptist Fellowship)", tradition: baptist, family: mainline, kind: official,
+     rss: "https://feeds.soundcloud.com/users/soundcloud:users:320254253/sounds.rss"}
+
+  # ---------------- Pentecostal / Charismatic ----------------
+  - {name: "Influence Podcast (Assemblies of God)", tradition: pentecostal_charismatic, family: evangelical, kind: official,
+     rss: "https://rss.libsyn.com/shows/70255/destinations/294882.xml"}
+  - {name: "We Are Vineyard (Vineyard USA)", tradition: pentecostal_charismatic, family: evangelical, kind: official,
+     rss: "https://feeds.castos.com/qwgd9"}
+  - {name: "Bethel Redding Sermon of the Week", tradition: pentecostal_charismatic, family: evangelical, kind: church,
+     rss: "https://feeds.podcastics.com/podcastics/podcasts/rss/3264_663448126aadcced270a1269572dcf99.rss"}
+  - {name: "North Cleveland Church of God", tradition: pentecostal_charismatic, family: evangelical, kind: church,
+     rss: "https://rss.libsyn.com/shows/86276/destinations/417470.xml"}
+  - {name: "Transformation Church (Michael Todd)", tradition: pentecostal_charismatic, family: evangelical, kind: church,
+     rss: "https://www.spreaker.com/show/4996262/episodes/feed"}
+
+  # ---------------- Black Protestant ----------------
+  - {name: "Pass The Mic (The Witness)", tradition: black_protestant, family: black_protestant, kind: influencer,
+     rss: "https://feeds.megaphone.fm/CHRTDY5587901552"}
+  - {name: "Jude 3 Project", tradition: black_protestant, family: black_protestant, kind: influencer,
+     rss: "https://feed.podbean.com/jude3project/feed.xml"}
+  - {name: "Truth's Table", tradition: black_protestant, family: black_protestant, kind: influencer,
+     rss: "https://feeds.redcircle.com/f4815ba0-1395-4b36-b009-5bbb04653d64"}
+  - {name: "Greater Emmanuel Institutional COGIC (Bishop J. Drew Sheard)", tradition: black_protestant, family: black_protestant, kind: church,
+     rss: "https://anchor.fm/s/8354af50/podcast/rss"}
+  - {name: "Allen Temple AME Church", tradition: black_protestant, family: black_protestant, kind: church,
+     rss: "https://allentempleamec.com/sermons?format=rss", enabled: false}   # feed returned 404 on 2026-10-07
+
+  # ---------------- Anabaptist ----------------
+  - {name: "Anabaptist Perspectives", tradition: anabaptist, family: anabaptist, kind: influencer,
+     rss: "https://feeds.captivate.fm/anabaptist-perspectives/"}
+  - {name: "MB Herald Podcast (Canadian Mennonite Brethren)", tradition: anabaptist, family: anabaptist, kind: official,
+     rss: "https://rss.buzzsprout.com/52148.rss"}
+  - {name: "Holding it(,) Together (Mennonite Church USA)", tradition: anabaptist, family: anabaptist, kind: official,
+     rss: "https://www.mennoniteusa.org/feed/podcast/holdingittogether/"}
+  - {name: "Lead/Follow (Mennonite Church USA)", tradition: anabaptist, family: anabaptist, kind: official,
+     rss: "https://www.mennoniteusa.org/feed/podcast/lead-follow/"}
+  - {name: "The Competent Pastor (Mennonite Church USA)", tradition: anabaptist, family: anabaptist, kind: official,
+     rss: "https://www.mennoniteusa.org/feed/podcast/the-competent-pastor/"}
+
+  # ---------------- Nondenominational evangelical ----------------
+  - {name: "BibleProject", tradition: nondenominational_evangelical, family: evangelical, kind: influencer,
+     rss: "https://feeds.simplecast.com/3NVmUWZO"}
+  - {name: "The Holy Post", tradition: nondenominational_evangelical, family: evangelical, kind: influencer,
+     rss: "https://rss.libsyn.com/shows/40819/destinations/121777.xml"}
+  - {name: "Unbelievable? (Premier)", tradition: nondenominational_evangelical, family: evangelical, kind: influencer,
+     rss: "https://pcr-rss.streamguys1.com/the-unbelievable/unbelievable.xml"}
+  - {name: "The Bible Recap", tradition: nondenominational_evangelical, family: evangelical, kind: influencer,
+     rss: "https://feed.podbean.com/thebiblerecap/feed.xml"}
+  - {name: "The Ten Minute Bible Hour", tradition: nondenominational_evangelical, family: evangelical, kind: influencer,
+     rss: "https://rss.buzzsprout.com/2544823.rss"}
+  - {name: "Craig Groeschel Leadership Podcast (Life.Church)", tradition: nondenominational_evangelical, family: evangelical, kind: church,
+     rss: "https://feeds.simplecast.com/atgtihd0"}
+  - {name: "Elevation with Steven Furtick", tradition: nondenominational_evangelical, family: evangelical, kind: church,
+     rss: "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/cbb40a38-726f-4243-a86e-b0ed01477640/ff9164b2-aa64-410d-9ee1-b0ed0147765c/podcast.rss"}
+     # audio feed via iHeart; the church's own feed is ~1 GB video files
+
+  # ---------------- Progressive / ecumenical ----------------
+  - {name: "The Bible for Normal People", tradition: progressive_ecumenical, family: progressive, kind: influencer,
+     rss: "https://feeds.megaphone.fm/ADL4119301527"}
+  - {name: "Another Name for Every Thing (Richard Rohr, CAC)", tradition: progressive_ecumenical, family: progressive, kind: influencer,
+     rss: "https://feeds.megaphone.fm/CFAC4279918867"}
+  - {name: "Learning How to See (Brian McLaren, CAC)", tradition: progressive_ecumenical, family: progressive, kind: influencer,
+     rss: "https://feeds.megaphone.fm/CFAC3846301578"}
+  - {name: "Everything Happens (Kate Bowler)", tradition: progressive_ecumenical, family: progressive, kind: influencer,
+     rss: "https://feeds.megaphone.fm/LEME6986128900"}
+  - {name: "Pulpit Fiction (lectionary)", tradition: progressive_ecumenical, family: progressive, kind: influencer,
+     rss: "https://rss.libsyn.com/shows/52376/destinations/188050.xml"}
+  - {name: "Homebrewed Christianity", tradition: progressive_ecumenical, family: progressive, kind: influencer,
+     rss: "https://feeds.megaphone.fm/NAANT9107400113"}
+  - {name: "Nomad Podcast", tradition: progressive_ecumenical, family: progressive, kind: influencer,
+     rss: "https://feeds.transistor.fm/nomad-podcast"}

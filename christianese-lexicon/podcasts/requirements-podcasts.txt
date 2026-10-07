@@ -1,0 +1,7 @@
+# Extra packages for scripts/podcasts_to_corpus.py (on top of requirements.txt)
+faster-whisper>=1.1
+yt-dlp>=2026.1.1               # lists YouTube channel uploads; downloads audio for the Whisper fallback
+youtube-transcript-api>=1.2    # YouTube's own captions (manual or auto-generated), tried first
+# CUDA 12 libraries for faster-whisper on the GPU (Windows/Linux wheels; the script finds the DLLs itself)
+nvidia-cublas-cu12
+nvidia-cudnn-cu12>=9,<10

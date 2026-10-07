@@ -1,0 +1,123 @@
+# Spoken filler and podcast/video boilerplate. Loaded by stage 05 when the config sets
+# filler_terms (transcribed corpora). Excluded from the shortlist unless also a seed term.
+okay
+ok
+yeah
+yeah yeah
+yeah yeah yeah
+oh yeah
+yes yes
+ha
+ha ha
+ha ha ha
+haha
+um
+uh
+hmm
+mm
+mhm
+wow
+gonna
+wanna
+kinda
+sort
+stuff
+whatever
+folks
+hey
+y'all
+somebody
+everybody
+we've
+you've
+we'll
+you'll
+they've
+podcast
+podcasts
+episode
+episodes
+listeners
+listener
+listening
+listen
+subscribe
+subscribers
+sponsor
+patreon
+slash
+com
+com slash
+dot com
+website
+link
+links
+youtube
+channel
+video
+videos
+comments
+click
+livestream
+today's
+welcome
+thanks
+interesting
+exactly
+literally
+basically
+actually
+ultimately
+wherever
+ourselves
+conversation
+conversations
+questions
+helpful
+deep
+ways
+toward
+forth
+became
+talked
+write
+speak
+speaks
+supposed
+recognize
+context
+quote
+reading
+dad
+# Bible-reference words (citing a passage, not vocabulary anyone needs explained)
+chapter
+chapters
+verse
+verses
+# conversational words that pass the common-English cutoff in speech-heavy text
+here's
+who's
+obviously
+absolutely
+happening
+happens
+kinds
+lives
+grew
+excited
+particular
+terms
+imagine
+mentioned
+forward
+seeing
+telling
+helps
+felt
+places
+certain
+wonderful
+thankful
+deeply
+tells
+org

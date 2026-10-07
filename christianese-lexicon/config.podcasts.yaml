@@ -1,9 +1,11 @@
-# Copy to config.yaml and edit. All paths are relative to this file.
+# Podcast corpus run (see podcasts/README-podcasts.md). All paths are relative to this file.
+# Same as config.example.yaml except: separate work dir, podcast-sized seeker cap.
 
-input_dir: data/raw          # put corpus files here (see README: Input format)
-work_dir: work               # all stage outputs, resumable
+input_dir: data/raw          # scripts/podcasts_to_corpus.py writes data/raw/podcasts.jsonl
+work_dir: work_podcasts      # kept apart from work/ so runs on other corpora don't mix
 seed_terms: data/seed_terms.txt
 generic_terms: data/generic_terms.txt
+filler_terms: data/spoken_filler.txt   # spoken filler + media boilerplate (transcribed corpora)
 observables: data/observables.txt
 features: data/features.yaml
 schema: schemas/lexicon_entry.schema.json
@@ -19,9 +21,10 @@ llm:
   timeout_s: 300
   max_retries: 3             # network retries
   json_repair_attempts: 2    # re-ask the model with the validation error (self-correction)
-  num_ctx: 8192              # chat context, sent with every call (not Ollama's default). Measured need:
-                             # draft = 1.5k system + 0.4k evidence + <=1.2k answer, ~5.8k with 2 repair rounds.
-                             # 14B Q4 (~9 GB) + 8k KV cache (~1.6 GB) fits a 16 GB GPU with room to spare.
+  num_ctx: 12288             # chat context, sent with every call (not Ollama's default). Measured need:
+                             # draft = 1.5k system + 0.4k evidence + <=1.2k answer; a repair round re-sends the
+                             # previous answer, and the 2026-10-07 run hit ~8.6k (est.) on one repair, so 12k.
+                             # 14B Q4 (~9 GB) + 12k KV cache (~2.4 GB) still fits a 16 GB GPU.
   num_predict: 2048          # cap on answer length; stops a runaway constrained-JSON generation
   embed_num_ctx: 2048        # embedding inputs are short contexts and 'term: glosses'
 
@@ -41,15 +44,19 @@ counts:
   max_ngram: 3
   min_count: 5               # minimum corpus count for a candidate term
   min_npmi: 0.25             # phrase cohesion threshold for bigrams/trigrams
+  min_sources: 3             # a term must be used by >= 3 different shows/channels
+  max_source_share: 0.6      # ...and no single show/channel may supply more than 60% of its uses
 
 keyness:
   reference_corpus_size: 10000000   # pseudo-size for the wordfreq English reference
   prior_strength: 500               # informative Dirichlet prior strength (Monroe et al. 2008)
   min_tradition_docs: 20            # tradition subcorpora smaller than this are skipped
+  min_tradition_sources: 2         # a tradition marker needs >= 2 of that tradition's sources
+  max_source_share: 0.6             # ...and no one source > 60% of that tradition's uses
 
 seeker:
   use_llm: true              # LLM extracts requested attributes from request sentences; false = n-gram fallback
-  max_requests: 5000         # cap on LLM extraction calls
+  max_requests: 2000         # cap on LLM extraction calls (podcast speech matches the request patterns loosely)
 
 shortlist:
   size: 300                  # terms that get the expensive analyses (embeddings, stance)
@@ -73,11 +80,12 @@ grounding:
   top_k: 8
 
 rank:
-  weights: {seeker: 1.0, keyness: 0.6, ambiguity: 1.0, seed: 0.5}
+  weights: {seeker: 1.0, keyness: 0.6, ambiguity: 1.0, seed: 1.5}   # seed raised from 0.5: no seeker signal yet
 
 draft:
   top_n: 150                 # terms drafted into lexicon entries
   contexts_in_prompt: 6
+  seed_min_count: 3          # also draft every seed term used >= 3 times, even below top_n
 
 dimensions:
   n_clusters: 7

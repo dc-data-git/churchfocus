@@ -62,7 +62,7 @@ STANCE_SCHEMA = {
     },
 }
 
-DRAFT_VERSION = "draft.v1"
+DRAFT_VERSION = "draft.v3"
 DRAFT_SYSTEM = """You are building a neutral reference lexicon of church vocabulary ("Christianese")
 for a church-discovery app that serves people of every Christian tradition.
 Your job: translate one term into OBSERVABLE FEATURES a researcher could verify
@@ -81,9 +81,20 @@ Rules:
    observable church practices only, never political labels.
 6. disambiguation_question: one short, neutral question to ask a user who says this
    term. Empty string only if the term is unambiguous.
-7. Set relevance to "not_relevant" if the term is generic boilerplate, a sign-off,
-   or a phrase fragment that nobody would need translated; fill the other fields minimally.
-8. Base your answer on the evidence (contexts, co-occurring words) first and general
+7. relevance (decide it LAST, after the senses and notes):
+   - "church_vocabulary": a word or phrase churches or churchgoers use whose meaning a
+     newcomer, or someone from another tradition, might need explained: doctrines,
+     practices, sacraments, offices, polity, worship styles, tradition names
+     (e.g. "diocese", "testimony", "communion", "altar call"). This is the usual answer.
+   - "logistics_term": practical vocabulary for visiting a church ("nursery", "parking").
+   - "not_relevant": filler, laughter, sign-offs, podcast or video boilerplate, personal
+     names, phrase fragments ("yeah yeah", "thanks for listening"), and everyday English
+     words used in their ordinary sense ("okay", "stuff", "conversation", "helpful"),
+     even when spoken in church. Ask: would a visitor need this word explained to
+     understand a church? If not, it is "not_relevant".
+8. Map each sense to the few features it actually implies (usually 1-3, never more
+   than 6). Do not list the whole vocabulary.
+9. Base your answer on the evidence (contexts, co-occurring words) first and general
    knowledge second. Say in notes if evidence was thin.
 Return JSON only."""
 

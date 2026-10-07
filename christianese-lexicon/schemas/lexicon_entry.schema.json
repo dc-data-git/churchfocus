@@ -5,25 +5,16 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "relevance",
     "aliases",
     "category",
     "term_types",
     "senses",
     "disambiguation_question",
     "neutral_options",
-    "notes"
+    "notes",
+    "relevance"
   ],
   "properties": {
-    "relevance": {
-      "type": "string",
-      "enum": [
-        "church_vocabulary",
-        "logistics_term",
-        "not_relevant"
-      ],
-      "description": "not_relevant = generic boilerplate or a phrase fragment that needs no translation (e.g. 'thanks in advance', 'parking is behind'). Such terms are dropped."
-    },
     "aliases": {
       "type": "array",
       "items": {
@@ -117,6 +108,15 @@
     },
     "notes": {
       "type": "string"
+    },
+    "relevance": {
+      "type": "string",
+      "enum": [
+        "church_vocabulary",
+        "logistics_term",
+        "not_relevant"
+      ],
+      "description": "Decided last. church_vocabulary = church terms a newcomer or someone from another tradition may need explained (the usual answer); logistics_term = practical visiting vocabulary; not_relevant = only filler, sign-offs, boilerplate, personal names or phrase fragments. Such terms are dropped."
     }
   }
 }

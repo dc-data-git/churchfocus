@@ -1,0 +1,93 @@
+{
+  "anabaptist": {
+    "items": 30,
+    "sources": 8,
+    "words": 56710,
+    "chunks": 222,
+    "youtube_items": 10
+  },
+  "anglican_episcopal": {
+    "items": 24,
+    "sources": 9,
+    "words": 48251,
+    "chunks": 191,
+    "youtube_items": 6
+  },
+  "baptist": {
+    "items": 31,
+    "sources": 8,
+    "words": 68645,
+    "chunks": 269,
+    "youtube_items": 15
+  },
+  "black_protestant": {
+    "items": 32,
+    "sources": 4,
+    "words": 72412,
+    "chunks": 284,
+    "youtube_items": 0
+  },
+  "catholic": {
+    "items": 30,
+    "sources": 10,
+    "words": 64641,
+    "chunks": 251,
+    "youtube_items": 9
+  },
+  "churches_of_christ": {
+    "items": 25,
+    "sources": 3,
+    "words": 59443,
+    "chunks": 234,
+    "youtube_items": 25
+  },
+  "lutheran": {
+    "items": 34,
+    "sources": 7,
+    "words": 74138,
+    "chunks": 288,
+    "youtube_items": 19
+  },
+  "methodist_wesleyan": {
+    "items": 28,
+    "sources": 6,
+    "words": 57214,
+    "chunks": 226,
+    "youtube_items": 13
+  },
+  "nondenominational_evangelical": {
+    "items": 35,
+    "sources": 7,
+    "words": 78972,
+    "chunks": 311,
+    "youtube_items": 0
+  },
+  "orthodox": {
+    "items": 34,
+    "sources": 7,
+    "words": 73301,
+    "chunks": 286,
+    "youtube_items": 14
+  },
+  "pentecostal_charismatic": {
+    "items": 30,
+    "sources": 8,
+    "words": 70176,
+    "chunks": 278,
+    "youtube_items": 10
+  },
+  "presbyterian_reformed": {
+    "items": 36,
+    "sources": 9,
+    "words": 69903,
+    "chunks": 274,
+    "youtube_items": 12
+  },
+  "progressive_ecumenical": {
+    "items": 35,
+    "sources": 7,
+    "words": 80188,
+    "chunks": 308,
+    "youtube_items": 0
+  }
+}

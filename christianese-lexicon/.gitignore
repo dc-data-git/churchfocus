@@ -12,3 +12,15 @@ work/*
 !work/out/
 !work/14_report/
 work_dryrun/
+
+# podcast/YouTube corpus: transcripts are copyrighted, keep them local.
+# Shared: the drafted lexicon, the run report and corpus counts (aggregate statistics only).
+podcasts/cache/
+podcasts/run.log
+podcasts/podcasts.log
+podcasts/selected.json
+work_podcasts/*
+!work_podcasts/out/
+!work_podcasts/14_report/
+config.drafttest.yaml
+run_overnight.err
