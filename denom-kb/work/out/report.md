@@ -1,19 +1,19 @@
 # denom-kb run report
 
-Generated 2026-10-07T10:46
+Generated 2026-10-07T11:24
 
-Groups processed: **213** of 217 · proposals: **4590** (applied after verification: **2863**)
+Groups processed: **213** of 217 · proposals: **4590** (applied after verification: **2778**)
 
 ## Coverage by layer
 
 | layer | known before | + filled | + not applicable | confirmed | conflicts | known after |
 |---|---|---|---|---|---|---|
-| identity | 1017 (19.5%) | 361 | 20 | 102 | 0 | 1398 (26.8%) |
-| history | 140 (5.4%) | 234 | 0 | 45 | 5 | 374 (14.4%) |
-| theology | 574 (6.0%) | 347 | 780 | 154 | 0 | 1701 (17.8%) |
-| governance | 217 (4.8%) | 175 | 60 | 34 | 1 | 452 (9.9%) |
-| practice_culture | 204 (2.4%) | 243 | 220 | 53 | 1 | 667 (7.9%) |
-| distinguishing_metadata | 549 (5.7%) | 26 | 0 | 2 | 0 | 575 (6.0%) |
+| identity | 1017 (19.5%) | 370 | 20 | 100 | 0 | 1407 (27.0%) |
+| history | 140 (5.4%) | 238 | 0 | 45 | 5 | 378 (14.5%) |
+| theology | 574 (6.0%) | 342 | 780 | 153 | 0 | 1696 (17.8%) |
+| governance | 217 (4.8%) | 148 | 60 | 33 | 0 | 425 (9.3%) |
+| practice_culture | 204 (2.4%) | 191 | 220 | 46 | 0 | 615 (7.3%) |
+| distinguishing_metadata | 549 (5.7%) | 24 | 0 | 3 | 0 | 573 (6.0%) |
 
 ## Groups
 
@@ -237,23 +237,22 @@ Groups processed: **213** of 217 · proposals: **4590** (applied after verificat
 
 | action | source | checked | supported | partial | unsupported |
 |---|---|---|---|---|---|
-| confirm | official | 433 | 169 (39%) | 88 | 176 |
-| confirm | register | 35 | 19 (54%) | 2 | 14 |
-| confirm | wikipedia | 422 | 194 (46%) | 71 | 157 |
-| conflict | official | 4 | 1 (25%) | 1 | 2 |
+| confirm | official | 433 | 168 (39%) | 67 | 198 |
+| confirm | register | 35 | 20 (57%) | 2 | 13 |
+| confirm | wikipedia | 430 | 192 (45%) | 53 | 185 |
+| conflict | official | 4 | 1 (25%) | 0 | 3 |
 | conflict | wikipedia | 9 | 6 (67%) | 0 | 3 |
-| fill | official | 883 | 402 (46%) | 162 | 319 |
-| fill | register | 43 | 20 (47%) | 9 | 14 |
-| fill | wikipedia | 1574 | 865 (55%) | 238 | 471 |
+| fill | official | 883 | 396 (45%) | 101 | 386 |
+| fill | register | 43 | 24 (56%) | 4 | 15 |
+| fill | wikipedia | 1574 | 864 (55%) | 163 | 547 |
 
-Verifier model: gpt-oss:120b-cloud. Not yet verified: 8.
+Verifier model: gpt-oss:120b-cloud. Not yet verified: 0.
+Sensitive-field proposals awaiting a human decision (never auto-applied): 127.
 
-## Conflicts to review (7)
+## Conflicts to review (5)
 
 - **African Methodist Episcopal Church** `history.parent_denomination`: existing "Methodist Episcopal Church" vs sources "Methodist Episcopal Church (originally)": "The AME Church was founded by Richard Allen (1760–1831) in 1787 when he called together five African American congregations of the previously established Method" (https://en.wikipedia.org/wiki/African_Methodist_Episcopal_Church)
-- **Catholic Church** `governance.women_ordination`: existing "Priesthood reserved to men" vs sources "Women cannot be ordained as priests": "According to the latest ruling, found in Ordinatio sacerdotalis, Pope John Paul II affirmed that the Catholic Church 'does not consider herself authorised to ad" (https://en.wikipedia.org/wiki/Catholic_Church)
 - **Church of Jesus Christ of Latter-day Saints** `history.founding_location`: existing "New York" vs sources "western New York": "The church was founded by Joseph Smith in 1830, originally as the Church of Christ in western New York." (https://en.wikipedia.org/wiki/The_Church_of_Jesus_Christ_of_Latter-day_Saints)
-- **Church of Jesus Christ of Latter-day Saints** `practice_culture.same_sex_marriage`: existing "Marriage teaching limited to man and woman" vs sources "Marriage teaching limited to man and woman": "The church's policies and treatment of sexual minorities and gender minorities have long been the subject of external criticism, as well as internal controversy" (https://en.wikipedia.org/wiki/The_Church_of_Jesus_Christ_of_Latter-day_Saints)
 - **Non-denominational Christian Churches** `history.founding_date`: existing "No single founding date" vs sources "18th century": "Non-denominational Christianity first arose in the 18th century through the Stone–Campbell Restoration Movement" (https://en.wikipedia.org/wiki/Non-denominational_Christianity)
 - **Salvation Army** `history.founding_location`: existing "London, England" vs sources "London, England; New York, USA": "George Scott Railton After serving as the Booths’ family secretary in London, George went on to establish The Salvation Army’s presence in New York." (https://www.salvationarmyusa.org/about-us/our-history/)
 - **Wesleyan Church** `history.founding_date`: existing "1968 present body" vs sources "1843": "The Wesleyan Methodist Connection was officially formed in 1843 at an organizing conference in Utica, New York, by a group of ministers and laymen splitting fro" (https://en.wikipedia.org/wiki/Wesleyan_Church)
@@ -267,4 +266,4 @@ Verifier model: gpt-oss:120b-cloud. Not yet verified: 8.
 | extract | qwen2.5:7b | 2177 | 0.858 | 4.0 | 224.3 | 902 | 7298815 | 1012483 |
 | match | qwen2.5:7b | 187 | 1.0 | 1.2 | 3.8 | 0 | 104645 | 10804 |
 | validate | qwen2.5:7b | 296 | 0.666 | 10.3 | 63.0 | 260 | 1598104 | 295983 |
-| verify | gpt-oss:120b-cloud | 910 | 0.515 | 3.0 | 49.6 | 1390 | 2207934 | 534567 |
+| verify | gpt-oss:120b-cloud | 1380 | 0.672 | 2.8 | 70.6 | 1888 | 3172309 | 764413 |
