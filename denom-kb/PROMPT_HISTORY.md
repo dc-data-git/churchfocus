@@ -22,6 +22,25 @@ category has no organization to match).
 v2 accepts the worldwide body when the census group is its US part, and still rejects broad families
 of separate denominations ("Baptists" for one convention).
 
+## extract.v1 (superseded 2026-10-07 by extract.v2)
+### What changed
+v1 listed up to 3 "example values from other groups" per field to keep style consistent.
+### What was wrong
+qwen2.5:7b copied the examples. A 40-claim hand audit of the first full run (213 groups, 2,599 fills)
+found fills such as American Carpatho-Russian Orthodox typical_worship_style = "Expressive prayer, preaching
+and music; local differences" and Conservative Judaism divorce_remarriage = "Marriage indissolubility;
+annulment..." (both copied example styles unrelated to the quote).
+Audit result for v1 fills: 14/40 supported (35%), 11/40 partial (28%), 15/40 unsupported (38%).
+Failure modes: (1) example leakage, (2) a real but irrelevant quote attached to the value (the verbatim
+check proves a quote exists, not that it supports the value), (3) field misread (e.g. parent_denomination
+set to the group itself).
+### Fix
+v2 drops the examples. Separately, verify.v1 (a second model, yes/no per claim) now gates every fill:
+only "supported" claims are applied.
+
+## verify.v1 (new 2026-10-07)
+See `VERIFY_SYSTEM` in `denomkb/prompts.py`. Default verifier: gpt-oss:120b-cloud via Ollama.
+
 <!--
 ## extract.v0 (superseded YYYY-MM-DD by extract.v1)
 ### Text

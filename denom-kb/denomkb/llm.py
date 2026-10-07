@@ -84,16 +84,20 @@ class LLM:
                 time.sleep(wait)
         raise LLMError(f"request failed after {self.max_retries} attempts: {last}")
 
-    def _chat_raw(self, model: str, messages: list[dict], schema: dict) -> tuple[str, int, int]:
+    def _chat_raw(self, model: str, messages: list[dict], schema: dict, think=None) -> tuple[str, int, int]:
         if self.provider == "ollama":
             payload = {
                 "model": model, "messages": messages, "stream": False, "format": schema,
-                "options": {"temperature": self.cfg.get("temperature", 0), "num_ctx": self.cfg.get("num_ctx", 8192)},
+                "options": {"temperature": self.cfg.get("temperature", 0), "num_ctx": self.cfg.get("num_ctx", 8192),
+                            "num_predict": self.cfg.get("num_predict", 1500)},   # stops runaway generations
             }
+            if think is not None:
+                payload["think"] = think
             d = self._post("/api/chat", payload)
             return d["message"]["content"], d.get("prompt_eval_count", 0), d.get("eval_count", 0)
         payload = {
             "model": model, "messages": messages, "temperature": self.cfg.get("temperature", 0),
+            "max_tokens": self.cfg.get("num_predict", 1500),
             "response_format": {"type": "json_schema", "json_schema": {"name": "output", "schema": schema}},
         }
         d = self._post("/v1/chat/completions", payload)
@@ -105,7 +109,7 @@ class LLM:
                       model: str | None = None,
                       fake: Callable[[list[dict]], Any] | None = None,
                       check: Callable[[Any], str | None] | None = None,
-                      partial: bool = False) -> Any:
+                      partial: bool = False, think=None) -> Any:
         """Return a JSON object matching `schema`.
 
         `check` is an optional semantic validator returning an error string or None
@@ -134,7 +138,7 @@ class LLM:
         err = None
         last_valid = None
         for repair in range(self.repair_attempts + 1):
-            content, pt, ct = self._chat_raw(model, msgs, schema)
+            content, pt, ct = self._chat_raw(model, msgs, schema, think)
             p_tok += pt
             c_tok += ct
             try:

@@ -100,6 +100,26 @@ re-exported every 5 groups, so you can stop at any time and use what's done.
 Every model call and web page is cached (`work/llm_cache.sqlite`, `work/web_cache/`). Re-runs
 cost nothing for work already done. `--force` re-processes groups (e.g. after an override).
 
+## Verification pass (run after every extraction run)
+
+The verbatim-quote check proves a quote *exists*; it does not prove the quote *supports* the value.
+A hand audit of 40 fills from the first full run found only 35% fully supported. So:
+
+```powershell
+.\.venv\Scripts\python.exe -m denomkb verify --model gpt-oss:120b-cloud        # all groups, largest first
+.\.venv\Scripts\python.exe -m denomkb verify --model gpt-oss:120b-cloud --max 40   # just the 40 largest
+```
+
+A second model judges each claim *supported / partial / unsupported* from the quote alone. Exports
+then apply only **supported** claims; everything stays in `proposals.csv` with `verify_verdict`,
+`verify_reason` and `applied` columns, and `report.md` gets a verification table. Resumable (saves after
+every batch; stops cleanly if the cloud model rate-limits; run again to continue).
+`gpt-oss:120b-cloud` runs on Ollama's cloud (only public web text + field names are sent); any local
+model works too (`--model qwen2.5:7b`), with a weaker check.
+
+To re-process groups that found no sources (exact Wikipedia title matches are now accepted
+automatically): `python -m denomkb run --redo-empty`, then `verify` again.
+
 ## Fixing what it gets wrong
 
 - **Wrong Wikipedia match or missing website:** add the group to `data/overrides.yaml`:

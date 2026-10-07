@@ -3,6 +3,7 @@
   python -m denomkb doctor   [-c config.yaml]       check workbook, model server, web access
   python -m denomkb run      [-c config.yaml] [--max N] [--only id1,id2] [--force] [--dry-run] [--offline]
   python -m denomkb status   [-c config.yaml]
+  python -m denomkb verify   [-c config.yaml] [--max N] [--model M]   check every quote supports its value
   python -m denomkb export   [-c config.yaml]       rebuild outputs from finished groups (also runs automatically)
 
 Groups are processed largest-first. Each finished group is saved immediately; outputs are
@@ -49,6 +50,15 @@ def cmd_run(args):
         cfg.setdefault("groups", {})["only"] = args.only.split(",")
     r = Runner(cfg, root, kb, web, llm, dry_run=args.dry_run)
     groups = r.order()
+    if args.redo_empty:
+        empty = []
+        for g in groups:
+            d = work / "groups" / g["id"] / "done.json"
+            if d.exists() and read_json(d).get("chunks", 0) == 0:
+                d.unlink()
+                empty.append(g)
+        log.info("re-processing %d groups that had no sources", len(empty))
+        groups = empty
     every = cfg.get("export_every", 5)
     log.info("processing %d groups (largest first); work dir %s", len(groups), work)
     t0 = time.time()
@@ -64,6 +74,23 @@ def cmd_run(args):
     finally:
         res = export.run(cfg, root, kb, args.dry_run)
         print(f"\nExported: {res}")
+
+
+def cmd_verify(args):
+    cfg, root, work, kb, web, llm = _setup(args)
+    fh = logging.FileHandler(work / "verify.log", encoding="utf-8")
+    fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    logging.getLogger().addHandler(fh)
+    from . import verify
+    if args.model:
+        cfg.setdefault("verify", {})["model"] = args.model
+    r = Runner(cfg, root, kb, web, llm)
+    groups = r.order()
+    if args.max:
+        groups = groups[: args.max]
+    res = verify.run(cfg, root, kb, llm, groups, dry_run=args.dry_run)
+    print("verify:", res)
+    print("export:", export.run(cfg, root, kb, args.dry_run))
 
 
 def cmd_export(args):
@@ -127,7 +154,13 @@ def main(argv=None):
     r.add_argument("--force", action="store_true", help="re-process groups already done (model calls stay cached)")
     r.add_argument("--dry-run", action="store_true", help="fake model outputs; separate work dir")
     r.add_argument("--offline", action="store_true", help="use only cached web pages")
+    r.add_argument("--redo-empty", action="store_true", help="re-process only groups that found no sources")
     r.set_defaults(fn=cmd_run)
+    v = sub.add_parser("verify", help="second-pass check: does each quote support its value?")
+    v.add_argument("--max", type=int, help="only the N largest groups")
+    v.add_argument("--model", help="override verify.model")
+    v.add_argument("--dry-run", action="store_true")
+    v.set_defaults(fn=cmd_verify)
     for name, fn in (("status", cmd_status), ("export", cmd_export), ("doctor", cmd_doctor)):
         sp = sub.add_parser(name)
         sp.add_argument("--dry-run", action="store_true")

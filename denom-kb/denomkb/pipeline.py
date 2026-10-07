@@ -29,6 +29,12 @@ NON_CHRISTIAN_FAMILY = re.compile(r"(muslim|islam|jewish|judaism|hindu|buddhis|b
                                   r"zoroastr|pagan|wicca|unitarian)", re.I)
 
 
+def _same_name(title: str, census_name: str) -> bool:
+    from .discover import clean_name
+    norm = lambda s: re.sub(r"[^a-z0-9]+", " ", s.lower().replace("the ", " ")).strip()
+    return norm(title) in (norm(census_name), norm(clean_name(census_name)))
+
+
 def now() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
 
@@ -76,7 +82,12 @@ class Runner:
 
         wp = wikipedia_by_title(self.web, ov["wikipedia"]) if ov.get("wikipedia") else wikipedia(self.web, g["census_name"])
         if wp:
-            verdict = "yes" if ov.get("wikipedia") else self._match(g, wp)
+            if ov.get("wikipedia"):
+                verdict = "yes"
+            elif _same_name(wp["title"], g["census_name"]):
+                verdict = "yes"          # exact title match: no model call (7B rejected these too often)
+            else:
+                verdict = self._match(g, wp)
             meta["wikipedia"] = {"title": wp["title"], "url": wp["url"], "score": wp["match_score"], "verdict": verdict}
             if verdict == "yes":
                 docs.append({"url": wp["url"], "title": wp["title"], "text": wp["text"], "source_type": "wikipedia"})
@@ -150,10 +161,8 @@ class Runner:
         ex = self._excerpts(bm, fids)
         if not ex:
             return []
-        flines = []
-        for f in fids:
-            eg = "; ".join(f'"{x}"' for x in self.examples.get(f, [])) or "(none yet)"
-            flines.append(f"- {f}: {self.spec[f]['description']}. Example values from other groups: {eg}")
+        # extract.v2: no example values from other groups (7B copied them verbatim)
+        flines = [f"- {f}: {self.spec[f]['description']}" for f in fids]
         user = (f"GROUP: {g['census_name']}\n\nFIELDS:\n" + "\n".join(flines) + "\n\nEXCERPTS:\n" + self._excerpt_block(ex))
 
         def check(v):
@@ -289,12 +298,26 @@ class Runner:
         if chunks:
             bm = BM25(chunks)
             for i in range(0, len(todo_extract), bs):
-                for x in self.extract(g, bm, todo_extract[i:i + bs]):
+                batch = todo_extract[i:i + bs]
+                try:
+                    found = self.extract(g, bm, batch)
+                except Exception as e:  # noqa: BLE001  one stuck batch must not sink the group
+                    log.warning("   extract batch skipped %s: %s", batch, e)
+                    stats.setdefault("skipped_batches", []).append(batch)
+                    continue
+                for x in found:
                     c = x["chunk"]
                     conf = "high" if c["source_type"] in ("official", "register") else "medium"
                     props.append(self._prop(g, x["field_id"], "fill", x["value"], x["quote"], c["url"], c["source_type"], conf))
             for i in range(0, len(todo_validate), bs):
-                for x in self.validate(g, bm, todo_validate[i:i + bs]):
+                batch = todo_validate[i:i + bs]
+                try:
+                    checked = self.validate(g, bm, batch)
+                except Exception as e:  # noqa: BLE001
+                    log.warning("   validate batch skipped %s: %s", batch, e)
+                    stats.setdefault("skipped_batches", []).append(batch)
+                    continue
+                for x in checked:
                     c = x["chunk"]
                     conf = "high" if c["source_type"] in ("official", "register") else "medium"
                     act = "confirm" if x["verdict"] == "supported" else "conflict"

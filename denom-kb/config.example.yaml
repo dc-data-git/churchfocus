@@ -13,6 +13,7 @@ llm:
   chat_model: qwen2.5:7b          # 8 GB VRAM: qwen2.5:7b or llama3.1:8b at Q4 (~5-6 GB with 8k context)
   temperature: 0
   num_ctx: 8192                   # prompts are ~3-4k tokens; 8k leaves room for repairs
+  num_predict: 1500               # max tokens per answer; stops a looping model from hanging a call
   timeout_s: 300
   max_retries: 3
   json_repair_attempts: 2         # model gets its own errors back (bad quote, missing field) and retries
@@ -36,6 +37,11 @@ extract:
 
 validate:
   enabled: true                   # check existing (non-Unknown) values against sources
+
+verify:                           # second pass: does each quote actually support its value?
+  model: gpt-oss:120b-cloud       # Ollama cloud model (public web text only is sent); or qwen2.5:7b to stay local
+  claims_per_call: 8
+  think: low                      # gpt-oss reasoning effort; remove for models without thinking
 
 groups:
   max: null                       # null = all 217, largest first. Try 3 first.

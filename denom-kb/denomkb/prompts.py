@@ -24,13 +24,13 @@ CLASSIFY_SCHEMA = {
     "properties": {"is_christian": {"type": "string", "enum": ["yes", "no", "unclear"]}, "quote": {"type": "string"}},
 }
 
-EXTRACT_VERSION = "extract.v1"
+EXTRACT_VERSION = "extract.v2"
 EXTRACT_SYSTEM = """You fill a neutral reference database about US religious groups.
 Use ONLY the numbered source excerpts provided. Never use outside knowledge, even if you are sure.
 
 For each requested field:
 - If the excerpts state it: status "stated", a short value (at most 20 words, neutral, describing the
-  group the way the group describes itself, in the style of the examples), the excerpt number, and a
+  group the way the group describes itself), the excerpt number, and a
   supporting quote copied EXACTLY from that excerpt (8-40 words, no ellipses, no paraphrase).
 - If the excerpts do not clearly state it: status "not_stated" with empty value, quote and excerpt 0.
 Do not guess. Do not infer a position from silence. Interpretive summaries must start with "Interpretation:".
@@ -72,4 +72,22 @@ VALIDATE_SCHEMA = {
         }}}},
 }
 
-VERSIONS = [MATCH_VERSION, CLASSIFY_VERSION, EXTRACT_VERSION, VALIDATE_VERSION]
+VERIFY_VERSION = "verify.v1"
+VERIFY_SYSTEM = """You audit claims in a reference database about US religious groups.
+Each claim says: for GROUP, the FIELD has VALUE, and gives a QUOTE as evidence.
+Judge ONLY whether the quote itself supports the value for that field. Ignore what you
+know from elsewhere; a true value with an irrelevant quote is NOT supported.
+- "supported": the quote clearly states the value (wording may differ, meaning must match)
+- "partial": the quote is related but the value adds, overstates or narrows something
+- "unsupported": the quote does not state the value, is about something else, or contradicts it
+Give a short reason (under 20 words). Return one verdict per claim id."""
+VERIFY_SCHEMA = {
+    "type": "object", "additionalProperties": False, "required": ["verdicts"],
+    "properties": {"verdicts": {"type": "array", "items": {
+        "type": "object", "additionalProperties": False, "required": ["id", "verdict", "reason"],
+        "properties": {"id": {"type": "integer"},
+                       "verdict": {"type": "string", "enum": ["supported", "partial", "unsupported"]},
+                       "reason": {"type": "string"}}}}},
+}
+
+VERSIONS = [MATCH_VERSION, CLASSIFY_VERSION, EXTRACT_VERSION, VALIDATE_VERSION, VERIFY_VERSION]

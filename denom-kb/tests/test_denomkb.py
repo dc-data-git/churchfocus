@@ -154,3 +154,35 @@ def test_fabricated_quote_is_dropped(project):
                        "excerpt": 1, "quote": "the fellowship joyfully ordains women as senior pastors"}]}
     llm.complete_json = lambda *a, **k: bad
     assert r.extract(kb.group("tbf"), bm, ["governance.women_ordination"]) == []
+
+
+def test_verify_filters_unsupported(project):
+    main(["-c", str(project / "config.yaml"), "run", "--dry-run", "--offline"])
+    work = project / "work_dryrun"
+    path = work / "groups" / "tbf" / "proposals.json"
+    props = json.loads(path.read_text())
+    # plant a fill whose quote does not support the value (the failure mode the audit found)
+    bad = dict(next(p for p in props if p["action"] == "fill" and p["source_type"] != "wikidata"))
+    bad.update(field_id="practice_culture.alcohol", new_value="Weekly communion with wine required", quote=BAPTIST_PAGE[:120])
+    props.append(bad)
+    path.write_text(json.dumps(props))
+    main(["-c", str(project / "config.yaml"), "verify", "--dry-run"])
+    props = json.loads(path.read_text())
+    checked = [p for p in props if p.get("verify")]
+    assert checked and all(p["verify"]["version"] == "verify.v1" for p in checked)
+    planted = next(p for p in props if p["new_value"] == "Weekly communion with wine required")
+    assert planted["verify"]["verdict"] == "unsupported"
+    rows = list(csv.DictReader(open(work / "out" / "proposals.csv", encoding="utf-8")))
+    r = next(x for x in rows if x["new_value"] == "Weekly communion with wine required")
+    assert r["applied"] == "no" and r["verify_verdict"] == "unsupported"
+    kbj = json.loads((work / "out" / "denominations_kb.json").read_text())
+    g = next(x for x in kbj["groups"] if x["id"] == "tbf")
+    assert all(e.get("quote") != BAPTIST_PAGE[:120] or e["action"] != "fill"
+               for e in g["fields"]["practice_culture.alcohol"]["evidence"])
+    assert "## Verification" in (work / "out" / "report.md").read_text()
+
+
+def test_same_name():
+    assert pl._same_name("Assemblies of God", "Assemblies of God")
+    assert pl._same_name("Church of God (Anderson, Indiana)", "Church of God (Anderson, Indiana)")
+    assert not pl._same_name("Full Gospel", "Full Gospel Christian Assemblies International")
