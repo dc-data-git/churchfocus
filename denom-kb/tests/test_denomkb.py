@@ -128,14 +128,28 @@ def test_dry_run_pipeline_and_export(project):
     out = work / "out"
     kbj = json.loads((out / "denominations_kb.json").read_text())
     g = next(x for x in kbj["groups"] if x["id"] == "tbf")
-    assert g["fields"]["governance.women_ordination"]["status"] == "model_extracted_needs_review"
-    assert g["fields"]["governance.women_ordination"]["evidence"][0]["url"].startswith("https://")
+    # sensitive field: proposed with a verified quote, but NOT applied until a human accepts it
+    assert g["fields"]["governance.women_ordination"]["status"] == "unknown"
+    assert g["fields"]["practice_culture.alcohol"]["status"] == "model_extracted_needs_review"
+    assert g["fields"]["practice_culture.alcohol"]["evidence"][0]["url"].startswith("https://")
     rows = list(csv.DictReader(open(out / "proposals.csv", encoding="utf-8")))
     assert rows and "review_decision" in rows[0]
+    wo = next(r for r in rows if r["group_id"] == "tbf" and r["field_id"] == "governance.women_ordination")
+    assert wo["applied"] == "no"
     wb = openpyxl.load_workbook(out / "US_Religious_Groups_filled.xlsx")
-    ws = wb["4 Governance"]
-    cell = ws.cell(row=6, column=3)
+    assert wb["4 Governance"].cell(row=6, column=3).value == "Unknown"
+    cell = wb["5 Practice and Culture"].cell(row=6, column=3)
     assert cell.value != "Unknown" and cell.comment is not None
+    # a human accepts it -> applied
+    wo["review_decision"] = "accept"
+    with open(project / "reviewed.csv", "w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=rows[0].keys())
+        w.writeheader()
+        w.writerows([wo])
+    main(["-c", str(project / "config.yaml"), "apply-review", str(project / "reviewed.csv"), "--dry-run"])
+    kbj = json.loads((out / "denominations_kb.json").read_text())
+    g = next(x for x in kbj["groups"] if x["id"] == "tbf")
+    assert g["fields"]["governance.women_ordination"]["status"] == "model_extracted_needs_review"
     assert "Proposals" in wb.sheetnames
     src = load(project / "kb.xlsx")                      # input untouched
     assert src.values[("tbf", "governance.women_ordination")] == "Unknown"
@@ -169,7 +183,7 @@ def test_verify_filters_unsupported(project):
     main(["-c", str(project / "config.yaml"), "verify", "--dry-run"])
     props = json.loads(path.read_text())
     checked = [p for p in props if p.get("verify")]
-    assert checked and all(p["verify"]["version"] == "verify.v1" for p in checked)
+    assert checked and all(p["verify"]["version"] == "verify.v2" for p in checked)
     planted = next(p for p in props if p["new_value"] == "Weekly communion with wine required")
     assert planted["verify"]["verdict"] == "unsupported"
     rows = list(csv.DictReader(open(work / "out" / "proposals.csv", encoding="utf-8")))

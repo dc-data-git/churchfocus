@@ -88,7 +88,8 @@ def run(cfg: dict, root: Path, kb: KB, dry_run: bool) -> dict:
             v = p.get("verify") or {}
             w.writerow({**p, "group": kb.group(p["group_id"])["census_name"], "verify_verdict": v.get("verdict", ""),
                         "verify_reason": v.get("reason", ""), "verify_model": v.get("model", ""),
-                        "applied": "yes" if _applied(p) else "no", "review_decision": "", "review_notes": ""})
+                        "applied": "yes" if _applied(p) else "no",
+                        "review_decision": p.get("human_decision", ""), "review_notes": p.get("human_notes", "")})
 
     # merged KB json
     by_gf = defaultdict(list)
@@ -171,6 +172,10 @@ def run(cfg: dict, root: Path, kb: KB, dry_run: bool) -> dict:
                   and not p.get("verify"))
         L.append("")
         L.append(f"Verifier model: {', '.join(sorted({p['verify']['model'] for p in ver}))}. Not yet verified: {unv}.")
+        from .verify import SENSITIVE_FIELDS
+        held = [p for p in all_props if p["field_id"] in SENSITIVE_FIELDS and p["action"] in ("fill", "conflict")
+                and not p.get("human_decision")]
+        L.append(f"Sensitive-field proposals awaiting a human decision (never auto-applied): {len(held)}.")
     conf = [p for p in props if p["action"] == "conflict"]
     L += ["", f"## Conflicts to review ({len(conf)})", ""]
     for p in conf[:60]:

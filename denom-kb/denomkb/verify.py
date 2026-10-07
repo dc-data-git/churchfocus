@@ -26,7 +26,7 @@ def needs_check(p: dict, model: str) -> bool:
     if p["action"] not in CHECKED_ACTIONS or p["source_type"] == "wikidata":
         return False
     v = p.get("verify")
-    return not v or v.get("model") != model
+    return not v or v.get("model") != model or v.get("version") != prompts.VERIFY_VERSION
 
 
 VERDICTS = {"supported", "partial", "unsupported"}
@@ -124,9 +124,49 @@ def run(cfg: dict, root, kb, llm, groups: list[dict], dry_run: bool = False) -> 
     return {**stats, "minutes": round((time.time() - t0) / 60, 1)}
 
 
+# Ethically sensitive fields are never applied automatically, even when the verifier passes them:
+# a person must accept them (review_decision column in proposals.csv -> `denomkb apply-review`).
+SENSITIVE_FIELDS = {
+    "practice_culture.lgbtq_relationships", "practice_culture.same_sex_marriage", "practice_culture.abortion",
+    "governance.women_ordination", "governance.women_senior_pastors", "governance.women_preaching",
+    "practice_culture.divorce_remarriage",
+}
+
+
 def applied(p: dict) -> bool:
     """Should this proposal change the knowledge base? Unverified runs behave as before."""
+    if p.get("human_decision") == "accept":
+        return True
+    if p.get("human_decision") == "reject":
+        return False
+    if p["field_id"] in SENSITIVE_FIELDS and p["action"] in ("fill", "conflict"):
+        return False
     if p["action"] not in CHECKED_ACTIONS or p["source_type"] == "wikidata":
         return True
     v = p.get("verify")
     return v is None or v["verdict"] == "supported"
+
+
+def apply_review(work, csv_path) -> dict:
+    """Copy accept/reject decisions from a reviewed proposals.csv back onto the per-group proposals."""
+    import csv
+    from pathlib import Path
+    decisions = {}
+    with open(csv_path, encoding="utf-8", newline="") as f:
+        for r in csv.DictReader(f):
+            d = (r.get("review_decision") or "").strip().lower()
+            if d in ("accept", "reject"):
+                decisions[(r["group_id"], r["field_id"], r["action"], r["new_value"])] = (d, r.get("review_notes", ""))
+    n = 0
+    for path in Path(work, "groups").glob("*/proposals.json"):
+        props = read_json(path)
+        changed = False
+        for p in props:
+            k = (p["group_id"], p["field_id"], p["action"], p["new_value"])
+            if k in decisions:
+                p["human_decision"], p["human_notes"] = decisions[k]
+                changed = True
+                n += 1
+        if changed:
+            write_json(path, props)
+    return {"decisions_applied": n}

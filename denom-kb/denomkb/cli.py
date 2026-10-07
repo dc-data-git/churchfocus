@@ -93,6 +93,13 @@ def cmd_verify(args):
     print("export:", export.run(cfg, root, kb, args.dry_run))
 
 
+def cmd_apply_review(args):
+    cfg, root, work, kb, web, llm = _setup(args)
+    from . import verify
+    print(verify.apply_review(work, args.csv))
+    print("export:", export.run(cfg, root, kb, getattr(args, "dry_run", False)))
+
+
 def cmd_export(args):
     cfg, root, work, kb, web, llm = _setup(args)
     print(export.run(cfg, root, kb, getattr(args, "dry_run", False)))
@@ -161,6 +168,10 @@ def main(argv=None):
     v.add_argument("--model", help="override verify.model")
     v.add_argument("--dry-run", action="store_true")
     v.set_defaults(fn=cmd_verify)
+    ar = sub.add_parser("apply-review", help="apply accept/reject decisions from a reviewed proposals.csv")
+    ar.add_argument("csv")
+    ar.add_argument("--dry-run", action="store_true")
+    ar.set_defaults(fn=cmd_apply_review)
     for name, fn in (("status", cmd_status), ("export", cmd_export), ("doctor", cmd_doctor)):
         sp = sub.add_parser(name)
         sp.add_argument("--dry-run", action="store_true")

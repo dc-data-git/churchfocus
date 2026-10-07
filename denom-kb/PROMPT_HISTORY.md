@@ -38,8 +38,23 @@ set to the group itself).
 v2 drops the examples. Separately, verify.v1 (a second model, yes/no per claim) now gates every fill:
 only "supported" claims are applied.
 
-## verify.v1 (new 2026-10-07)
-See `VERIFY_SYSTEM` in `denomkb/prompts.py`. Default verifier: gpt-oss:120b-cloud via Ollama.
+## verify.v1 (superseded 2026-10-07 by verify.v2)
+### Text
+You audit claims in a reference database about US religious groups. Each claim says: for GROUP, the FIELD
+has VALUE, and gives a QUOTE as evidence. Judge ONLY whether the quote itself supports the value for that
+field. Ignore what you know from elsewhere; a true value with an irrelevant quote is NOT supported.
+supported / partial / unsupported. Give a short reason (under 20 words). Return one verdict per claim id.
+### Result
+gpt-oss:120b-cloud, 3,403 claims: 50% supported, 17% partial, 33% unsupported. Hand audit of 30 random
+"supported" fills: 20 correct (67%), 4 partial (13%), 6 wrong (20%) (up from 35% correct before verification).
+### What was wrong
+All 6 errors were field mismatches: the quote supported the value, but the value did not answer the field
+(sexual-ethics resolution filed as clergy_celibacy; immigration statement as scripture_interpretation;
+"includes ... the LGBTQ+ community" (a list of people served) as lgbtq_relationships policy).
+### Fix
+v2 requires (a) quote states value AND (b) value answers the field, with those failure examples in the prompt.
+Separately, ethically sensitive fields (LGBTQ, same-sex marriage, abortion, women's ordination/preaching/senior
+pastors, divorce) are never auto-applied: a person must accept them in proposals.csv (`denomkb apply-review`).
 
 <!--
 ## extract.v0 (superseded YYYY-MM-DD by extract.v1)

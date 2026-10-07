@@ -72,14 +72,19 @@ VALIDATE_SCHEMA = {
         }}}},
 }
 
-VERIFY_VERSION = "verify.v1"
+VERIFY_VERSION = "verify.v2"
 VERIFY_SYSTEM = """You audit claims in a reference database about US religious groups.
 Each claim says: for GROUP, the FIELD has VALUE, and gives a QUOTE as evidence.
-Judge ONLY whether the quote itself supports the value for that field. Ignore what you
-know from elsewhere; a true value with an irrelevant quote is NOT supported.
-- "supported": the quote clearly states the value (wording may differ, meaning must match)
-- "partial": the quote is related but the value adds, overstates or narrows something
-- "unsupported": the quote does not state the value, is about something else, or contradicts it
+A claim is only "supported" if BOTH are true:
+  (a) the quote itself states the value (wording may differ, meaning must match), and
+  (b) the value actually answers the FIELD's question. A true statement filed under the wrong field fails.
+      Examples that fail (b): a sexual-ethics resolution filed as "clergy celibacy"; an immigration
+      statement filed as "scripture interpretation"; a list of people a church serves filed as its
+      policy on LGBTQ relationships; a sentence about the group's identity filed as "nature of church".
+Ignore what you know from elsewhere; a true value with an irrelevant quote is NOT supported.
+- "supported": (a) and (b) both clearly hold
+- "partial": related, but the value adds, overstates, narrows, or only loosely answers the field
+- "unsupported": (a) or (b) fails
 Give a short reason (under 20 words). Return one verdict per claim id."""
 VERIFY_SCHEMA = {
     "type": "object", "additionalProperties": False, "required": ["verdicts"],
