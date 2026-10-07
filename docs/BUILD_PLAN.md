@@ -1,9 +1,11 @@
 # Church Search — BUILD_PLAN (Cursor handoff)
 
 Clock: start ~12:45 pm CT. **Preliminary submission 10:00 pm CT** (code + 250-word description). Finalist submission 9:00 am MT Thu.
-Each person drives their own Cursor session on **their own files only** (avoids merge conflicts). Every Cursor prompt starts with:
+Each person drives their own Cursor session on **their own files only** (avoids merge conflicts). Owner changes vs. the text below (tasks.json wins): T1.2 OSM → Wade; T6.2 results page → Katie; T7.3 report → Carter; new T7.4 deep-search routes → Daniel. Every Cursor prompt starts with:
 
-> Read AGENTS.md, docs/CONVENTIONS.md and docs/INTERFACES.md. Do task <ID> from docs/BUILD_PLAN.md. Touch only the files listed. Finish with the listed tests passing, or reply "blocked: <reason>".
+> Read AGENTS.md, docs/CONVENTIONS.md and docs/INTERFACES.md. Do task <ID> from tasks.json (details in docs/BUILD_PLAN.md). Run `python scripts/tasks.py set <ID> in_progress` first. Touch only the files listed. Finish with the listed checks passing and `python scripts/tasks.py set <ID> done "<result>"`, or set it blocked with the reason and tell me.
+
+State of the build: `python scripts/tasks.py` (board), `python scripts/tasks.py next <name>` (what you can start). `tasks.json` splits T0–T8 into sub-tasks (T0.1…T8.4) and is the source of truth for owner and status; this file holds the detail.
 
 ## Critical path
 ```

@@ -21,5 +21,9 @@ Python 3.11+, FastAPI, Jinja2 + HTMX, SQLite (stdlib `sqlite3`), httpx, pydantic
 - Names match INTERFACES.md exactly.
 - If you could not do part of the task, say **blocked: <specific reason>** at the top of your reply instead of improvising.
 
+## Build state (tasks.json)
+`tasks.json` (repo root) is the single record of build state. Change it **only** with `python scripts/tasks.py`:
+`set <ID> in_progress` when you start, `set <ID> done "<short result, e.g. 9 tests green>"` when the checks pass, `set <ID> blocked "<specific reason>"` when stuck. `python scripts/tasks.py` shows the board; `python scripts/tasks.py next <name>` shows what you can start. Commit tasks.json together with the work it describes.
+
 ## Git
 Small commits, one module per commit, message `<area>: <what>`. Pull before you push. Do not commit `.env`, `data/`, or large media.
