@@ -527,3 +527,29 @@ def research_purge() -> int:
                                   (scope,_iso(_utcnow()-timedelta(days=days)))).rowcount
         conn.commit()
     return count
+
+
+def delete_test_sessions(session_ids: list[str]) -> dict:
+    """Explicit maintenance: delete selected test chats and unshared church research."""
+    ids = list(dict.fromkeys(session_ids))
+    if not ids:
+        return {"sessions": 0, "churches": 0, "reports": []}
+    placeholders = ",".join("?" for _ in ids)
+    with _connect() as conn:
+        cids = {r[0] for r in conn.execute(f"SELECT church_id FROM session_churches WHERE session_id IN ({placeholders})", ids)}
+        cids.update(r[0] for r in conn.execute(f"SELECT church_id FROM jobs WHERE session_id IN ({placeholders})", ids))
+        reports = [r[0] for r in conn.execute(f"SELECT report_path FROM jobs WHERE session_id IN ({placeholders})", ids) if r[0]]
+        for table in ("messages", "memory_log", "coverage", "questions", "session_state", "session_churches", "jobs"):
+            conn.execute(f"DELETE FROM {table} WHERE session_id IN ({placeholders})", ids)
+        count = conn.execute(f"DELETE FROM sessions WHERE id IN ({placeholders})", ids).rowcount
+        unique = {cid for cid in cids if not conn.execute("SELECT 1 FROM session_churches WHERE church_id=?", (cid,)).fetchone()
+                  and not conn.execute("SELECT 1 FROM jobs WHERE church_id=?", (cid,)).fetchone()}
+        for cid in unique:
+            urls = [r[0] for r in conn.execute("SELECT url FROM research_sources WHERE church_id=?", (cid,))]
+            for table in ("evidence", "research_sources", "churches"):
+                conn.execute(f"DELETE FROM {table} WHERE church_id=?", (cid,))
+            for url in urls:
+                if not conn.execute("SELECT 1 FROM research_sources WHERE url=?", (url,)).fetchone():
+                    conn.execute("DELETE FROM cache WHERE key=?", (url,))
+            conn.execute("DELETE FROM cache WHERE instr(key,?)>0", (cid,))
+    return {"sessions": count, "churches": len(unique), "reports": reports}

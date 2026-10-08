@@ -44,6 +44,8 @@ def agreement(e: Evidence | None, want: list[str], fid: str, avoid: list[str] | 
         if want:
             return 1 if any(w.lower() in low for w in want) else -1
         return 0
+    if fid == "theology.scripture" and set(want) == {"inerrant", "infallible", "inspired_authoritative"} and any(v in want for v in vals):
+        return 1
     if any(v in avoid for v in vals):
         return -1
     if want:
@@ -102,6 +104,8 @@ def score_evidence(church_id: str, profile: PreferenceProfile, best: dict[str, E
         meta = feature(p.feature)
         e = best.get(p.feature)
         m = agreement(e, p.want, p.feature, p.avoid)
+        if p.feature in IDENTITY_FILTER and p.avoid and not p.want and m >= 0:
+            continue  # Excluding one family must not reward every unrelated denomination.
         total_w += w
         label = meta["label"]
         if m == 0:
@@ -143,6 +147,12 @@ def score(church: Church, profile: PreferenceProfile, kb=None) -> MatchResult:
     for p in profile.preferences:
         if p.feature in ("identity.tradition", "identity.branch") and kb is not None and did:
             e = best_evidence(church.evidence, p.feature) or kb.prior(did, p.feature)
+            if e is None and p.feature == "identity.tradition":
+                # A named Lutheran/Anglican denomination establishes its family, not its worship or doctrine.
+                name = (kb.groups.get(did, {}).get("name") or church.denomination.label or "").casefold()
+                family = "lutheran" if "lutheran" in name else "anglican_episcopal" if "anglican" in name or "episcopal" in name else None
+                if family:
+                    e = Evidence(feature=p.feature,value=family,tier="prior",how="prior",source_kind="denomination_kb",note="Family from identified denomination name; practices remain unverified")
             if e is not None:
                 best[p.feature] = e
             continue
@@ -156,7 +166,7 @@ def score(church: Church, profile: PreferenceProfile, kb=None) -> MatchResult:
         if e is not None:
             best[p.feature] = e
     # Explicit positive affiliation requests constrain the candidate list only when affiliation is verified.
-    identity_wants = [p for p in profile.preferences if p.feature in IDENTITY_FILTER and p.want and p.weight != "dont_care" and p.conf >= 0.8]
+    identity_wants = [p for p in profile.preferences if p.feature in IDENTITY_FILTER and p.want and p.weight == "dealbreaker" and p.conf >= 0.8]
     result_excluded = False
     if church.denomination.confidence >= 0.8 and church.denomination.method != "unknown":
         for pref in identity_wants:
@@ -167,6 +177,10 @@ def score(church: Church, profile: PreferenceProfile, kb=None) -> MatchResult:
     result = score_evidence(church.church_id, profile, best, denom_conf=church.denomination.confidence, variability=var,
                           denom_label=church.denomination.label, distance_miles=church.distance_miles)
 
+    worship_mismatch = any(p.feature in {"worship.style", "worship.liturgy"} and p.want and p.weight in {"important", "dealbreaker"}
+        and p.feature in best and agreement(best[p.feature],p.want,p.feature,p.avoid) < 0 for p in profile.preferences)
+    if worship_mismatch and result.fit in {"strong", "possible"}:
+        result = result.model_copy(update={"fit":"unlikely"})
     if result_excluded:
         result = result.model_copy(update={"excluded":True})
     return result

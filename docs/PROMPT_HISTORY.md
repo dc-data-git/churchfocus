@@ -47,3 +47,9 @@ interview_skill.v5 supersedesv4 solely for the ChurchFocus product identity; res
 Deep_search.v4 adds explicit YouTube caption workflow and full-service vs sermon distinction; v3 lacked supported video retrieval.
 
 Deep_search.v5 supersedes v4: broken/incomplete channel hints require adaptive public source recovery; explicit identity verification, recent varied recording discovery, real-caption attempts, bounded retries and truthful incomplete-coverage reporting. v4 supported direct YouTube retrieval but lacked recovery instructions. Released v4 preserved.
+
+Interview_skill.v6 fixes repeated liturgy questions, helping-other context, broad family vs denomination routing, additive hymns/liturgy and independent avoid preferences, unjustified inerrancy and fabricated hard requirements. v5 preserved.
+
+Interview_skill.v7 clarifies value/stance negation; v6 permitted the observed avoid:no inversion.
+
+interview_skill.v8: v7 could acknowledge Protestant scope without storing it; requires saved broad Protestant affiliation and explicit non-Protestant exclusions.

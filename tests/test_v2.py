@@ -61,12 +61,12 @@ def test_turn_applies_valid_ops_and_drops_bad(env):
         ]}
     out = conversation.turn("s2", "We love hymns")
     cur = memory.current("s2")
-    assert cur["worship.style"].val == "traditional_hymns"
-    assert cur["worship.style"].t == 1
+    assert cur["worship.music_sources"].val == "hymns"
+    assert cur["worship.music_sources"].t == 1
     assert [m["text"] for m in out["messages"]] == ["We love hymns", "Hymns it is."]
     assert out["messages"][-1]["meta"]["options"] == ["Show me the matches"]
     pref = memory.to_profile("s2").preferences[0]
-    assert pref.feature == "worship.style" and pref.weight == "important"
+    assert pref.feature == "worship.music_sources" and pref.weight == "important"
 
 
 def test_location_geocodes_and_starts_search(env, monkeypatch):
@@ -229,7 +229,7 @@ def test_completed_deep_job_is_not_reused_for_new_questions(env,monkeypatch):
 def test_live_model_add_synonym_preserves_preference(env):
     reasons = conversation._apply_ops("live-op",1,[{"op":"add","key":"worship.style","val":"traditional_hymns","strength":.7,"conf":.95,"src":"stated"}])
     assert reasons == []
-    assert memory.to_profile("live-op").preferences[0].want == ["traditional_hymns"]
+    assert memory.to_profile("live-op").preferences[0].want == ["hymns"]
 
 
 def test_location_memory_op_starts_search_when_top_level_field_missing(env,monkeypatch):

@@ -101,11 +101,12 @@ def _ensure_coverage(session_id: str, lat: float, lng: float, radius_mi: float) 
         return 0   # D40: nothing new to fetch
     generation = db.session_state(session_id)["generation"]
     store = _session(session_id)
-    found: dict[str, dict] = {}
-    queries = 0
+    from app import jobs, memory
+    queries = added = 0
+    # Keep the original bounded circle/ring search. Publish each completed circle.
     for plat, plng, prad in _points(lat, lng, radius_mi):
         if db.session_state(session_id)["generation"] != generation:
-            return 0
+            return added
         try:
             res = places.search_churches(plat, plng, int(prad / MI_PER_M), max_results=60)
             queries += 1
@@ -116,32 +117,34 @@ def _ensure_coverage(session_id: str, lat: float, lng: float, radius_mi: float) 
                 queries += 1
             except Exception:
                 res = []
-        for c in res:
-            c["distance_miles"] = round(_miles(lat, lng, c.get("lat") or 0, c.get("lng") or 0), 2)
-            if c["distance_miles"] <= radius_mi and c.get("church_id"):
-                found[c["church_id"]] = c
-    from app import jobs
+        with jobs._lock:
+            if db.session_state(session_id)["generation"] != generation:
+                return added
+            batch_added = 0
+            for c in res:
+                cid = c.get("church_id")
+                c["distance_miles"] = round(_miles(lat, lng, c.get("lat") or 0, c.get("lng") or 0), 2)
+                if not cid or c["distance_miles"] > radius_mi:
+                    continue
+                if cid in store:
+                    continue
+                d = _fast_denom(c)
+                if _non_nicene(c, d):
+                    continue
+                store[cid] = {"candidate": c, "denom": d.model_dump(mode="json")}
+                db.session_church_put(session_id, cid, c, store[cid]["denom"])
+                batch_added += 1
+            added += batch_added
+            if batch_added:
+                memory.bump_table(session_id)
+    if not queries:
+        raise RuntimeError("Both map search providers failed")
     with jobs._lock:
-        if db.session_state(session_id)["generation"] != generation:
-            return 0
-        added = 0
-        for cid, c in found.items():
-            if cid in store:
-                store[cid]["candidate"]["distance_miles"] = c["distance_miles"]
-                continue
-            d = _fast_denom(c)
-            if _non_nicene(c, d):   # D29
-                continue
-            store[cid] = {"candidate": c, "denom": d.model_dump(mode="json")}
-            db.session_church_put(session_id, cid, c, store[cid]["denom"])
-            added += 1
-        if queries:
+        if db.session_state(session_id)["generation"] == generation:
             db.coverage_add(session_id, lat, lng, radius_mi, queries)
-        else:
-            raise RuntimeError("Both map search providers failed")
-        from app import memory
-        memory.bump_table(session_id)
-        return added
+            memory.bump_table(session_id)
+    return added
+
 
 
 def _church(entry: dict) -> Church:

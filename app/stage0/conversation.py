@@ -101,7 +101,7 @@ def _system_prompt(sid: str, text: str) -> str:
     hint_text = "\n".join(f"- \"{h['term']}\": {h.get('gloss', '')} → {json.dumps(h.get('features'))}" for h in hints) or "(none)"
     loc = memory.location(sid)
     return "\n\n".join([
-        llm.load_prompt("interview_skill.v5"),
+        llm.load_prompt("interview_skill.v8"),
         "## ABOUT YOU: current view and historical corrections/reasons\n" + json.dumps(memory.context(sid),ensure_ascii=False),
         "## RESEARCH STATE\n" + json.dumps(db.session_state(sid)),
         "## STARTING PLACE\n" + (json.dumps({k: loc.get(k) for k in ("text", "limit_miles")}) if loc else "(not given yet)"),
@@ -233,7 +233,7 @@ def _denomination_answer(question: str, ref: str | list[str] | None) -> str:
         return f"{info['name']} is in the {info.get('tradition') or 'Christian'} tradition. Individual congregations vary."
 
 
-def _apply_ops(sid: str, t: int, raw_ops: list) -> list[str]:
+def _apply_ops(sid: str, t: int, raw_ops: list, *, text: str = "") -> list[str]:
     ops, dropped = [], []
     for o in raw_ops or []:
         if not isinstance(o, dict) or o.get("key") == "location":
@@ -244,9 +244,40 @@ def _apply_ops(sid: str, t: int, raw_ops: list) -> list[str]:
                 o["op"] = "assert"  # Preserve valid preferences from the observed legacy model synonym.
             if o.get("op") == "revise" and not o.get("supersedes"):
                 o["supersedes"] = None
+            evidence = str(o.get("ev") or "").casefold()
+            source_text = text.casefold() or evidence
+            if o.get("src", "stated") != "user_edit":
+                mandatory = re.search(r"\b(must|required|require|non.negotiable|only|never|wouldn.t be comfortable|not comfortable|rule out|exclude)\b", evidence)
+                if not mandatory:
+                    o["strength"] = min(float(o.get("strength",0.6)), 0.7)
+            if o.get("key") in {"denomination", "identity.denomination"}:
+                specific = re.search(r"missouri|wisconsin|synod|episcopal|\blcms\b|\bwels\b|\bels\b|\bacna\b", evidence)
+                families = []
+                if not specific:
+                    if "lutheran" in evidence: families.append("lutheran")
+                    if "anglican" in evidence: families.append("anglican_episcopal")
+                if families:
+                    o.update(key="identity.tradition", val=families)
+                elif "catholic" in evidence and o.get("stance") == "avoid":
+                    o.update(key="identity.branch", val="catholic")
+            if o.get("key") == "identity.branch" and o.get("stance") == "want" and "protestant" in source_text and "mainline" not in source_text and "evangelical" not in source_text:
+                o.update(val=["mainline_protestant","evangelical_protestant","black_protestant","pentecostal_charismatic","restorationist","anabaptist"])
+            if o.get("key") == "theology.scripture" and "biblical authority" in evidence and not re.search(r"inerran|without error",evidence):
+                o.update(val=["inerrant","infallible","inspired_authoritative"])
+            if o.get("key") == "worship.style" and o.get("val") == "traditional_hymns":
+                o.update(key="worship.music_sources",val="hymns")
+            if o.get("key") == "women.senior_pastor" and o.get("stance") == "avoid" and o.get("val") == "no" and re.search(r"not (?:as )?(?:head|lead|senior) pastors?|not .*priests?|except .*pastors?", source_text):
+                o.update(stance="want",val="no")
             ops.append(MemoryOp.model_validate(o))
         except Exception as e:
             dropped.append(f"bad op {o!r}: {e}"[:200])
+    if re.search(r"\b(?:definitely|only|must be|strictly) protestant\b", text, re.I):
+        ops = [o for o in ops if o.key != "identity.branch"]
+        branches = ["mainline_protestant", "evangelical_protestant", "black_protestant", "pentecostal_charismatic", "restorationist", "anabaptist"]
+        ops.extend([
+            MemoryOp(t=t,op="revise",key="identity.branch",val=branches,stance="want",strength=.9,conf=1,src="stated",ev=text[:200]),
+            MemoryOp(t=t,op="revise",key="identity.branch",val=["catholic","eastern_orthodox","oriental_orthodox"],stance="avoid",strength=.9,conf=1,src="stated",ev=text[:200]),
+        ])
     return dropped + memory.append(sid, ops)
 
 
@@ -294,7 +325,11 @@ def _turn(session_id: str, text: str | None) -> dict:
         db.state_update(sid,restart_pending=True,pending_location=out.get("location"))
         chat.post(sid,"Would you like to start a new chat, or change this search here?",{"options":["Start a new chat","Change this search here"]})
         return {"messages":chat.since(sid,start_n)}
-    dropped = _apply_ops(sid, t, out.get("memory_ops"))
+    if re.search(r"help(?:ing)? (?:my|our|a|someone|their).*?(?:in-laws|in laws|parents|friend|find|church)",text,re.I):
+        memory.append(sid,[MemoryOp(t=t,key="for_whom",val="other",ev=text[:200],why="Explicitly helping someone else",strength=0.6,conf=1,src="stated")])
+    dropped = _apply_ops(sid, t, out.get("memory_ops"),text=text)
+    if re.search(r"prioriti[sz]e.*liturgical",text,re.I):
+        memory.append(sid,[MemoryOp(t=t,key="worship.style",val="liturgical_traditional",stance="want",strength=.7,conf=1,src="stated",ev=text[:200],why="Explicit priority for liturgical worship")])
     reply = out.get("reply") or ""
     options = out.get("options") if isinstance(out.get("options"), list) else None
     intent = out.get("intent") or "chat"

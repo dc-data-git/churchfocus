@@ -332,3 +332,11 @@ C2: web.fetch extract_version3 recovers published Servant Keeper content and men
 C3: web.youtube_video_id validates public video URLs; youtube_videos(url,limit) returns bounded public recordings; youtube_captions(url) returns text/segments/minutes/source/is_generated. get_sermons accepts YouTube URLs. Caption failures are explicit; deep core attempts sermon discovery/transcription/analysis before model loop and marks zero-analysis reports partial.
 
 C4: Active deep_search.v5 governs bounded recovery of incomplete YouTube hints through existing search_web/fetch_page/read_source/get_sermons/transcribe_sermons/analyse_sermons tools; verify congregation identity before attributing candidate-channel teaching. No new tools or research-limit changes.
+
+C5: _preference_ops preserves independent want/avoid views and additive assertions; explicit revise/retract remain corrections. Broad families use identity.tradition; Catholic avoids use identity.branch. Positive identities hard-filter only at explicit dealbreaker weight. Avoid-only nonmatches neither score nor dilute preferences. Known important worship mismatches cannot label possible/strong fit. Active interview_skill.v6; no changes to sermon caps.
+
+C6: explicit no-women-as-head-pastor language normalizes incorrect avoid:no to want:no; preaching/other roles unchanged. Active interview_skill.v7.
+
+C7: explicit Definitely/Only Protestant scope is persisted independently of model ops; saturated map circles are refined four ways to depth2. Search remains provider-limited, not exhaustive.
+
+C8 supersedes C7 recursive refinement: discovery returns to one circle or seven ring circles; completed circle candidates publish immediately. Coverage is marked complete only after the batch, and resets fence stale writes.

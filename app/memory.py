@@ -93,6 +93,24 @@ def location(session_id: str) -> dict | None:
     return op.val if op and isinstance(op.val, dict) else None
 
 
+def _preference_ops(session_id: str) -> list[MemoryOp]:
+    """Independent wanted/avoided views; assertions add, explicit revisions replace."""
+    states = {}
+    for op in log(session_id):
+        if op.key in {"location", "for_whom"}:
+            continue
+        if op.op == "retract" or op.stance == "neutral":
+            states = {k:v for k,v in states.items() if k[0] != op.key}
+            continue
+        key = (op.key, op.stance)
+        old = states.get(key)
+        if old and op.op in {"assert", "confirm"}:
+            vals = lambda x: x if isinstance(x,list) else [x]
+            op = op.model_copy(update={"val": list(dict.fromkeys(vals(old.val)+vals(op.val)))})
+        states[key] = op
+    return list(states.values())
+
+
 def to_profile(session_id: str) -> PreferenceProfile:
     cur = current(session_id)
     prof = PreferenceProfile(session_id=session_id)
@@ -105,7 +123,8 @@ def to_profile(session_id: str) -> PreferenceProfile:
     if fw and fw.val in ("self", "other"):
         prof.for_whom = fw.val
     feats = all_features()
-    for key, op in cur.items():
+    for op in _preference_ops(session_id):
+        key = op.key
         if key in NON_FEATURE_KEYS and key != "denomination":
             continue
         fid = "identity.denomination" if key == "denomination" else key
@@ -115,6 +134,12 @@ def to_profile(session_id: str) -> PreferenceProfile:
         w = _weight(op.strength, op.conf, bool(feats[fid].get("sensitive")), op.src)
         pref = Preference(feature=fid, weight=w, said=op.ev[:200], strength=op.strength, conf=op.conf,
                           want=vals if op.stance == "want" else [], avoid=vals if op.stance == "avoid" else [])
+        old = next((p for p in prof.preferences if p.feature == fid), None)
+        if old:
+            pref.want = list(dict.fromkeys(old.want + pref.want))
+            pref.avoid = list(dict.fromkeys(old.avoid + pref.avoid))
+            levels = ["dont_care", "nice_to_have", "important", "dealbreaker"]
+            pref.weight = max((old.weight,pref.weight),key=levels.index)
         prof.preferences = [p for p in prof.preferences if p.feature != fid] + [pref]
     return prof
 
@@ -147,7 +172,8 @@ def plain_summary(session_id: str) -> list[dict]:
     src_text = {"stated": "you said so", "confirmed": "you confirmed", "user_edit": "you edited this",
                 "inferred": "my guess from what you said", "lexicon": "my guess from your wording"}
     out = []
-    for key, op in current(session_id).items():
+    ops = [(k,v) for k,v in current(session_id).items() if k in {"location","for_whom"}] + [(op.key,op) for op in _preference_ops(session_id)]
+    for key, op in ops:
         if op.stance == "neutral" and key not in ("location", "for_whom"):
             continue
         out.append({"key": key, "text": _label(op), "src": op.src, "src_text": src_text.get(op.src, op.src),
@@ -174,4 +200,5 @@ def dump(session_id: str) -> str:
 def context(session_id: str) -> dict:
     """History preserves corrections/reasons; current view alone drives active filters."""
     return {"current": {key: op.model_dump(mode="json") for key,op in current(session_id).items()},
-            "history": [op.model_dump(mode="json") for op in log(session_id)]}
+            "history": [op.model_dump(mode="json") for op in log(session_id)],
+            "effective_preferences": [p.model_dump(mode="json") for p in to_profile(session_id).preferences]}
