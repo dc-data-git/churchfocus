@@ -55,48 +55,106 @@ def _classify_page(url: str, link_kind: str) -> str:
     return link_kind if link_kind != "other" else "other"
 
 
-def site_pages(url: str, max_pages: int = 8) -> list[dict]:
-    """Return up to max_pages [{url, kind, text}] from the church site."""
+def _page_key(url: str) -> tuple:
+    parsed = urlparse(url)
+    return (parsed.netloc.lower().removeprefix("www."), parsed.path.rstrip("/") or "/", parsed.query)
+
+
+def resource_kind(url: str, label: str = "") -> str | None:
+    """Large/changing public collections are catalogued, not exhaustively crawled."""
+    combined = f"{url} {label}".lower()
+    for kind, pattern in (("calendar", r"calendar|events"), ("sermons", r"sermon|podcast|messages|/watch|/media"),
+                          ("groups", r"small.groups|group.finder|group.directory"),
+                          ("bulletins", r"bulletin|newsletter"), ("registration", r"registration|register")):
+        if re.search(pattern, combined):
+            return kind
+    return None
+
+
+def site_pages(url: str, max_pages: int = 30, *, cancelled=None, progress=None,
+               max_seconds: float = 120, coverage=None, resources=None) -> list[dict]:
+    """Bounded recursive same-site factual scan; expose limits rather than claim completeness."""
+    import time
+    cancelled = cancelled or (lambda: False)
+    progress = progress or (lambda *args: None)
+    coverage = coverage if coverage is not None else {}
+    resources = resources if resources is not None else []
+    coverage.update(pages_scanned=0, limited=False, failures=[], missing_basics=[])
     if not url:
         return []
-
-    home_url = url.rstrip("/") + ("" if url.endswith("/") else "")
-    if not home_url.startswith("http"):
-        home_url = "https://" + home_url.lstrip("/")
-
-    try:
-        home = fetch(home_url if home_url.endswith("/") else home_url + "/")
-    except Blocked:
-        return []
-
-    base = home["url"]
-    pages: list[dict] = [{"url": base, "kind": "home", "text": home["text"]}]
-    seen = {base.rstrip("/"), base.rstrip("/") + "/"}
-
-    candidates: list[tuple[int, str, str]] = []
-    for link in home.get("links", []):
-        href = link.get("href", "")
-        if not href or _BLOCKLIST_HINT.search(href):
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    queue = [(200, url.rstrip("/") + "/", "home", False)]
+    seen, final_seen, pages, known_resources = set(), set(), [], set()
+    started = time.monotonic()
+    base = url
+    while queue and len(pages) < max_pages and time.monotonic() - started < max_seconds:
+        if cancelled():
+            break
+        queue.sort(key=lambda item: (-item[0], item[1]))
+        _, target, kind, collection = queue.pop(0)
+        key = _page_key(target)
+        if key in seen:
             continue
-        full = _normalize_url(base, href)
-        key = full.rstrip("/")
-        if key in seen or not _same_site(base, full):
-            continue
-        score, kind = _score_link(href, link.get("text", ""))
-        if score > 0:
-            candidates.append((score, full, kind))
-            seen.add(key)
-
-    candidates.sort(key=lambda x: (-x[0], x[1]))
-    for _, page_url, link_kind in candidates[: max(0, max_pages - 1)]:
-        if _BLOCKLIST_HINT.search(urlparse(page_url).path):
-            continue
+        seen.add(key)
         try:
-            result = fetch(page_url)
+            result = fetch(target, max_chars=60000, max_age_days=7)
         except Blocked:
+            coverage["failures"].append({"url": target, "reason": "not permitted"})
             continue
-        if result.get("status", 0) != 200 or not (result.get("text") or "").strip():
+        if result.get("status") != 200 or result.get("error") or not result.get("text", "").strip():
+            coverage["failures"].append({"url": target, "reason": result.get("error", "no readable content")})
             continue
-        kind = _classify_page(result["url"], link_kind)
-        pages.append({"url": result["url"], "kind": kind, "text": result["text"]})
+        if not _same_site(base, result["url"]):
+            coverage["failures"].append({"url": target, "reason": "redirected outside church site"})
+            continue
+        final_key = _page_key(result["url"])
+        if final_key in final_seen:
+            continue
+        final_seen.add(final_key)
+        seen.add(final_key)
+        if not pages:
+            base = result["url"]
+        pages.append({"url": result["url"], "kind": kind, "text": result["text"],
+                      "text_truncated": result.get("text_truncated", False),
+                      "checked_at": result.get("checked_at"), "from_cache": result.get("from_cache", False)})
+        progress(len(pages), max_pages, f"Scanning website — {len(pages)} pages read")
+        # Collection landing pages establish availability; individual archive entries stay on demand.
+        if collection:
+            continue
+        for link in result.get("links", []):
+            full = _normalize_url(result["url"], link.get("href", ""))
+            if not link.get("href") or _BLOCKLIST_HINT.search(full) or not full.startswith(("https://", "http://")):
+                continue
+            rk = resource_kind(full, link.get("text", ""))
+            if rk and full not in known_resources:
+                resources.append({"kind": rk, "url": full, "label": link.get("text") or rk})
+                known_resources.add(full)
+            if rk in {"calendar", "registration"}:
+                continue
+            if not _same_site(base, full) or _page_key(full) in seen:
+                continue
+            if re.search(r"\.(?:jpg|png|gif|svg|mp3|mp4|zip|css|js)(?:\?|$)", full, re.I):
+                continue
+            # Discard tracking/pagination/search query variants and individual dated event entries.
+            if urlparse(full).query or re.search(r"/(?:event|events)/.+|/20\d\d/", urlparse(full).path):
+                continue
+            score, lk = _score_link(full, link.get("text", ""))
+            queue.append((score, full, _classify_page(full, lk), bool(rk)))
+    coverage["pages_scanned"] = len(pages)
+    coverage["limited"] = bool(queue) and not cancelled()
+    coverage["limit_reason"] = ("page/time budget reached" if coverage["limited"] else "")
+    coverage["truncated_pages"] = [p["url"] for p in pages if p.get("text_truncated")]
+    if coverage["truncated_pages"]:
+        coverage["limited"] = True
+        coverage["limit_reason"] += "; page text budget reached (60,000 characters)"
+    # Repeated footer text is removed only from extraction, never from retained source documents.
+    lines = {}
+    for page in pages:
+        for line in set(x.strip() for x in page["text"].splitlines() if x.strip()):
+            lines[line] = lines.get(line, 0) + 1
+    for page in pages:
+        page["scan_text"] = "\n".join(line for line in page["text"].splitlines()
+             if not (len(pages) >= 3 and lines.get(line.strip(), 0) >= max(3, len(pages) * .7)
+                     and re.search(r"copyright|all rights reserved|privacy policy|powered by", line, re.I)))
     return pages

@@ -16,9 +16,12 @@ def now() -> datetime:
 
 class Preference(BaseModel):
     feature: str
-    want: list[str]
-    weight: Weight
+    want: list[str] = Field(default_factory=list)
+    weight: Weight = "important"
     said: str = ""
+    avoid: list[str] = Field(default_factory=list)   # v2 (D27/D28): values the person does not want
+    strength: float = 0.5                            # 0..1 from the memory log
+    conf: float = 1.0                                # 0..1 how sure we are
 
 
 class PreferenceProfile(BaseModel):
@@ -65,10 +68,15 @@ class Church(BaseModel):
     stage_done: int = 1
 
 
+Fit = Literal["strong", "possible", "unknown", "unlikely", "poor"]
+
+
 class MatchResult(BaseModel):
     church_id: str
     score: float
     excluded: bool
+    fit: Fit = "unknown"          # v2 (D31)
+    known_share: float = 0.0      # share of preference weight with any evidence/prior
     matched: list[str] = Field(default_factory=list)
     unmatched: list[str] = Field(default_factory=list)
     unknown: list[str] = Field(default_factory=list)
@@ -109,3 +117,18 @@ class ChurchReport(BaseModel):
     questions_for_visit: list[str] = Field(default_factory=list)
     generated_at: datetime = Field(default_factory=now)
     log_path: str = ""
+
+
+class MemoryOp(BaseModel):
+    """One line of the per-session memory log (D27, REDESIGN §2). Append-only."""
+    t: int = 0
+    op: Literal["assert", "revise", "confirm", "retract"] = "assert"
+    key: str
+    val: str | list[str] | dict = ""
+    stance: Literal["want", "avoid", "neutral"] = "want"
+    strength: float = 0.5
+    conf: float = 0.5
+    src: Literal["stated", "inferred", "confirmed", "user_edit", "lexicon"] = "inferred"
+    ev: str = ""
+    why: str = ""
+    supersedes: int | None = None

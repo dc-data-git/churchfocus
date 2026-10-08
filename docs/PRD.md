@@ -1,4 +1,4 @@
-# Church Search — PRD
+# ChurchFocus — PRD
 
 Status: v1 spec for the 2026 Gloo AI Hackathon (Track 1, Agents of Flourishing). Living document.
 Owner: Daniel (integration, Stage 1). Theology: Katie. Shared research doc + Stage 3 sources: Carter. Stage 3 sources: Wade.
@@ -102,7 +102,7 @@ An interactive church finder that **does not maintain a database of churches**. 
 | D10 | No fixed demo city; live demo, with a pre-started deep dive and a recorded backup. |
 | D11 | Marriage rule: a marriage definition is the church's position on same-sex marriage; it does not settle LGBTQ membership/leadership. |
 | D12 | Roles: Katie theology; Carter shared doc + Stage 3 sources; Wade Stage 3 sources; Daniel integration + Stage 1. |
-| D13 | App name: Church Search. |
+| D13 | App name: ChurchFocus. |
 | D14 | Stage 0 asks the LGBTQ question by default (neutral options). |
 | D15 | `contracts/features.yaml` (features.v2) is the single shared vocabulary. Source tiers A/B/C/D + prior. |
 | D16 | Stack: Python 3.11+, FastAPI, Jinja2 + HTMX, SQLite. (Dev default; veto-able.) |
@@ -118,3 +118,6 @@ An interactive church finder that **does not maintain a database of churches**. 
 - Q1 Burden validation quote (HUMAN, Daniel).
 - ~~Q2 Sermon budget~~ — resolved by D22 (cap 25). Live demo uses a pre-started deep dive.
 - Q3 Hosting for "runnable without a developer": Render/Railway vs local `run.bat`. Default: local + recorded demo tonight; hosted tomorrow morning if time.
+
+## Evening rebuild supersessions
+Decisions D24–D44 in `docs/ISSUES.md` supersede earlier interview and matching decisions where they conflict; `docs/REDESIGN.md` defines the current contracts. In particular, D33 replaces D14 (belief topics are only discussed when raised by the user), D34 replaces D19 (mapped lexicon hints are integrated), D28 replaces practice-based hard exclusions (fit changes; explicit denomination exclusions remain), and D43 sets research retention to 90/365 days with reuse under 30 days. Search coverage expands on demand up to 50 miles.

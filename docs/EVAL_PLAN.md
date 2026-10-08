@@ -1,4 +1,4 @@
-# Church Search — EVAL_PLAN
+# ChurchFocus — EVAL_PLAN
 
 Goal: numbers we can defend in the Agent Build Doc and on stage, plus a published eval set (bonus).
 

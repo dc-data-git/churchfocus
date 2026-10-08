@@ -1,4 +1,4 @@
-# Church Search — INTERFACES (name registry; anti-drift contract)
+# ChurchFocus — INTERFACES (name registry; anti-drift contract)
 
 Every module, function, schema, route and env var used across tasks is named here. If you need a new name, add it here first.
 Containment rules are normative: **nothing outside the named module does that job.**
@@ -65,7 +65,7 @@ church-discorvery-hackathon/
 | `DEEP_MAX_TOOL_CALLS` | `150` | Stage 3 call budget (D22) |
 | `DEEP_MAX_SERMONS` | `25` | Stage 3 sermon cap per church (D22) |
 | `CACHE_MAX_AGE_DAYS` | `30` | reuse window before re-check |
-| `USER_AGENT` | `ChurchSearch/0.1 (+contact email)` | fetcher |
+| `USER_AGENT` | `ChurchFocus/0.1 (+contact email)` | fetcher |
 
 Secrets live only in `.env` (gitignored). Never log keys.
 
@@ -298,3 +298,37 @@ fastapi, uvicorn, jinja2, python-multipart, httpx, pydantic, python-dotenv, PyYA
 
 Tools (thin wrappers of `DenomKB`): `find_denomination(text)`, `get_denomination(id)`, `compare_denominations(a, b, features)`, `match_profile(profile_json)`, `denomination_prior(id, feature)`.
 Run: `python -m app.denom.mcp_server` (stdio). Optional HTTP/SSE transport for the "open endpoint" bonus.
+
+## Rebuild integration additions (Oct 7)
+`db.session_church_reset(session_id)` clears session candidates and coverage when the origin changes. Question edits require the question to belong to the current session. Reports carry `narrative.your_questions` with sourced answers or explicit unknowns.
+
+
+## October 7 repair contracts (supersedes v2 lifecycle)
+- db.session_state(sid)->dict defaults {generation:0,pins:[],selection_mode:false,selected:[],active_church:null}; db.state_update(sid, **fields)->dict; db.state_reset(sid)->dict increments generation, clears pins/selection. job columns generation:int, visible:int default1, announced:int default0, verified_at:str nullable. SQL only db.
+- db.research_put(church_id,url,text,*,kind='website',title='',speaker='',published_at='',scope='medium')->None; db.research_sources(church_id, scope=None)->list dict {url,text,kind,title,speaker,published_at,scope,checked_at,text_hash}; same URL+scope upsert, persist raw public text. Call only after cancellation check. Expiry scope medium90/deep365. Research verification time means fetched/verified, not cached reuse.
+- jobs.submit(sid,cid,kind,*,questions=(),visible=True)->job_id; deduplicated current generation, promote visible; jobs.cancel; jobs.is_cancelled checks generation; jobs.prepare(sid)->dict starts top5 hidden + selection_mode; jobs.select(sid,ids)->dict validates1–5/pins/cancels unselected/releases; jobs.pin(sid,cid,pinned)->dict; jobs.reset_session(sid)->None cancels/increments; jobs.status exposes only visible current-generation jobs plus elapsed_seconds and real counts.
+- Medium medium_search returns existing match/evidence/settled/open plus pages, facts[{label,value,quote,url,kind,checked_at}], staff[{name,position,quote,url}], resources[{kind,url,label}], coverage{pages_scanned,limited,failures,missing_basics}, deep_dive_candidate/reason; cancellation dict supported. Persist full source text through research_put. Baseline factual extraction independent of prefs; retain all full public staff records. Runtime jobs preserves new result fields.
+- Deep deep_search(church,profile,job_id) checks jobs.is_cancelled between calls/tools and before final writes. Persists all fetched relevant public source text and sermons with research_put(...scope='deep',kind='sermon'). Result_json includes coverage ledger and resources; report includes limitations. Existing db.update_job won't overwrite cancelled terminal state. New deep_search.v3 prompt owned senior agent.
+- qa.answer uses research_sources + saved resources, relevance excerpts, then guarded bounded resource lookup; no deep job creation. Existing answer shape preserved. Optional cancellation callback for batch answering not mandatory. New medium_extract.v1 owned backend agent.
+- POST /api/know_more {session_id,action:'prepare'|'submit',church_ids?}; response {jobs,research:session_state}. Default submit backward-compatible. POST /api/pin {session_id,church_id,pinned:bool}; POST /api/restart {session_id,mode:'new'|'continue'} -> {session_id,research}. New mode cancels old before new sid; continue clears current candidates/jobs but retains historical memory.
+- GET /api/state/sid adds research session state. GET churches rows adds pinned:bool,summary:object|null,stage2:status,progress real-count percentage|null, affiliation_verified:bool,mismatch:bool; summaries/jobs are visibility gated. Pinned first even mismatch with honest indication. Table adds discovery{status,label} and research state.
+- Chat new-search intent offers restart choice before reset; options may include 'Start a new chat' and 'Change this search here'. Deep intent must resolve unique church or clarify, and creates visible job before acknowledgement. Supplied URL validated via existing web guard. New interview_skill.v4 owned root.
+- UI ownership: app/static/app.js, app/static/app.css, app/templates/app.html. Backend medium owns app/stage2/{website,summary}.py, app/qa.py, app/web.py, new medium prompt/tests. Senior owns app/stage3/agent.py,tools.py,sermons.py,report.py and report template, new deep prompt/tests. Root owns db/jobs/memory/main/stage0conversation/stage1search/config/task/docs and integration. Prompt history root aggregates.
+
+- tools.review_coverage(ctx,area,status,summary,urls=[]) tracks thematic minimum areas identity/governance, full_public_staff, services/worship, ministries/community, stated_beliefs, sermon_teaching, history/public_context. Deep result includes coverage,resources,limitations,sermons_analysed. db.research_put optional checked_at:str preserves cache verification date. match positive stated identity requests exclude verified mismatches only; pins may still show honest mismatch.
+
+- POST /api/radius {session_id,radius} updates location limit through user_edit memory and expands silent nearby discovery. GET table never changes personal memory.
+- tools.read_source(ctx,url,query='',offset=0) returns bounded12k excerpts with offsets/full length from persisted/fetched source; deep agent can inspect remaining staff/transcript content. Quotes accepted only contiguous normalized excerpts at exact named URL.
+
+- Medium job result research_version=4 invalidates older preference-limited/article-only summaries. website coverage.extractor_version='medium_extract.v1/target-aware-hero' invalidates older per-page extraction reuse. Public HTML cache extract_version2 includes meaningful hero/body text and invalidates older truncated caches.
+
+- sermons.analyse_sermons(texts,features,*,church_id=None,cancelled=None) checks cancellation between model calls and before aggregation. Actual transcribed page_url uses page/transcript/audio source fallback.
+
+## ChurchFocus brand and background
+Client updateFocus() derives decorative scene focus from actual current session location and visible authorized job status: no origin0, nearby1, medium active2, medium complete3, deep active/partial4, deep complete without gaps5. No time-based or fabricated research percent. Stage resets on location removal/session-generation change; reduced motion disables transitions. Scene is aria-hidden and pointer-events:none. Current product branding ChurchFocus; released prompt archives preserved, active interview_skill.v5 supersedesv4.
+
+C2: web.fetch extract_version3 recovers published Servant Keeper content and menu JSON without execution; inadequate shells return error and are not cached. Medium research_version5 invalidates failed legacy summaries.
+
+C3: web.youtube_video_id validates public video URLs; youtube_videos(url,limit) returns bounded public recordings; youtube_captions(url) returns text/segments/minutes/source/is_generated. get_sermons accepts YouTube URLs. Caption failures are explicit; deep core attempts sermon discovery/transcription/analysis before model loop and marks zero-analysis reports partial.
+
+C4: Active deep_search.v5 governs bounded recovery of incomplete YouTube hints through existing search_web/fetch_page/read_source/get_sermons/transcribe_sermons/analyse_sermons tools; verify congregation identity before attributing candidate-channel teaching. No new tools or research-limit changes.

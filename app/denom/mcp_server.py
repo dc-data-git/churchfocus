@@ -21,7 +21,7 @@ INSTRUCTIONS = ("Reference data about 217 US religious groups (2020 US Religion 
                 "Values are what a denomination TYPICALLY holds, not facts about a particular congregation. "
                 "Sensitive fields are only returned when original or human-reviewed.")
 
-server = _Server(name="church-search-denominations", instructions=INSTRUCTIONS)
+server = _Server(name="churchfocus-denominations", instructions=INSTRUCTIONS)
 
 
 @server.tool()
@@ -38,13 +38,13 @@ def get_denomination(denomination_id: str) -> dict:
 
 @server.tool()
 def compare_denominations(a: str, b: str, features: list[str]) -> list[dict]:
-    """Compare two denominations on Church Search feature ids (see contracts/features.yaml)."""
+    """Compare two denominations on ChurchFocus feature ids (see contracts/features.yaml)."""
     return get_kb().compare(a, b, features)
 
 
 @server.tool()
 def match_profile(profile_json: str, k: int = 8) -> list[dict]:
-    """Likely denominations for a Church Search PreferenceProfile (JSON string), best first, with reasons."""
+    """Likely denominations for a ChurchFocus PreferenceProfile (JSON string), best first, with reasons."""
     return get_kb().match_profile(PreferenceProfile.model_validate(json.loads(profile_json)), k)
 
 

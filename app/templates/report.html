@@ -147,7 +147,7 @@
 
   {% if known_evidence %}
   <section class="section">
-    <h2>Evidence collected</h2>
+    <h2>Sources and details</h2>
     <table>
       <thead>
         <tr><th>Feature</th><th>Value</th><th>Tier</th><th>How</th><th>Quote / note</th><th>Source</th></tr>
@@ -157,7 +157,7 @@
         <tr>
           <td>{{ feature_labels.get(ev.feature, ev.feature) }}</td>
           <td>{{ ev.value }}</td>
-          <td>{{ ev.tier }}</td>
+          <td>{{ {"A":"Church website", "B":"Independent report", "C":"Third-party listing", "D":"Inferred from sermons", "prior":"Typical for denomination"}.get(ev.tier, ev.tier) }}</td>
           <td>{{ ev.how }}</td>
           <td>{% if ev.quote %}"{{ ev.quote }}"{% elif ev.note %}{{ ev.note }}{% else %}—{% endif %}</td>
           <td>{% set u = ev.url | safe_url %}{% if u %}<a href="{{ u }}" rel="noopener nofollow">{{ ev.source_kind.replace('_', ' ') }}</a>{% else %}{{ ev.source_kind.replace('_', ' ') }}{% endif %}
@@ -169,8 +169,23 @@
   </section>
   {% endif %}
 
+  {% if narrative.get('your_questions') %}
+  <section class="section"><h2>Your questions</h2>
+    {% for q in narrative.your_questions %}
+    <h3>{{ q.text }}</h3><p>{{ q.answer }}</p>
+    {% for s in q.sources %}{% set u = s.url | safe_url %}{% if u %}<a href="{{ u }}" rel="noopener nofollow">Source</a>{% endif %}{% endfor %}
+    {% endfor %}
+  </section>
+  {% endif %}
+  {% if narrative.get('coverage') %}
+  <section class="section"><h2>Research coverage</h2>
+  <p>{{ narrative.get('sermons_analysed', 0) }} sermons analysed. This is a sample of published teaching, not every belief held by the church.</p>
+  <ul>{% for area, item in narrative.coverage.items() %}<li><strong>{{ area.replace('_',' ') | title }}</strong>: {{ item.status.replace('_',' ') }}. {{ item.summary }}{% for url in item.urls %}{% set u = url | safe_url %}{% if u %} <a href="{{ u }}">Source</a>{% endif %}{% endfor %}</li>{% endfor %}</ul>
+  {% for note in narrative.get('limitations', []) %}<p class="escalation">{{ note }}</p>{% endfor %}
+  </section>
+  {% endif %}
   <footer>
-    <p>Church Search — evidence-based research report. Session {{ report.profile_session }}.</p>
+    <p>ChurchFocus — evidence-based research report. Session {{ report.profile_session }}.</p>
     <p>Church name and address from Google Maps. Tiers: A = the church's own words · B = independent source · C = weak signal · D = inferred from sermons · "typical for" = denomination default, may differ locally.</p>
     <p class="no-print">Use your browser's Print → Save as PDF for a shareable copy.</p>
   </footer>

@@ -56,6 +56,28 @@ def main(argv: list[str]) -> None:
     by_id = {t["id"]: t for t in d["tasks"]}
     if not argv:
         return board(d)
+    if argv[0] == "register" and len(argv) == 2:
+        spec = json.loads(Path(argv[1]).read_text(encoding="utf-8"))
+        if "project" in spec:
+            d["project"] = spec["project"]
+        for task in spec.get("tasks", []):
+            if task["id"] not in by_id:
+                d["tasks"].append(task)
+        known = {m["id"] for m in d["milestones"]}
+        d["milestones"].extend(m for m in spec.get("milestones", []) if m["id"] not in known)
+        save(d)
+        print("Registered repair tasks")
+        return
+    if argv[0] == "annotate" and len(argv) == 3:
+        tid = argv[1]
+        if tid not in by_id:
+            sys.exit(f"unknown task {tid!r}")
+        metadata = json.loads(Path(argv[2]).read_text(encoding="utf-8"))
+        allowed = {"files", "acceptance", "verification", "next_action", "review_roles"}
+        by_id[tid].update({k:v for k,v in metadata.items() if k in allowed})
+        save(d)
+        print(f"Annotated {tid}")
+        return
     if argv[0] == "next":
         who = argv[1].lower() if len(argv) > 1 else None
         for t in d["tasks"]:

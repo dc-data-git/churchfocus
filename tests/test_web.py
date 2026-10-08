@@ -127,3 +127,19 @@ def test_error_pages_not_cached(data_dir, monkeypatch):
     assert r["status"] == 403 and r["text"] == ""
     from app.db import cache_get
     assert cache_get("https://x.org/a") is None
+
+
+def test_published_embedded_page_recovers_content_and_menu():
+    from app.web import _published_embedded_html, _extract_text, _extract_links
+    page = {"groups": [{"content": "<p>Sunday worship at 10:30am</p>", "default": "<p>Editor placeholder</p>"}]}
+    pages = [{"uuid": "staff", "slug": "our-staff"}]
+    menu = {"items": [{"details": {"pageUuid": "staff", "title": "Our Staff"}}]}
+    html = "<script>window.Page = FW.Models.Page.findOrCreate(" + json.dumps(page) + ");FW.store.set('pages', new FW.Models.Pages(" + json.dumps(pages) + "));FW.store.set('menu', FW.Models.Menu.findOrCreate(" + json.dumps(menu) + "));</script>"
+    recovered = _published_embedded_html(html)
+    assert "10:30am" in _extract_text(recovered, "https://example.church", 10000)
+    assert "Editor placeholder" not in recovered
+    assert {"href": "https://example.church/our-staff", "text": "Our Staff"} in _extract_links(recovered, "https://example.church")
+
+def test_invalid_embedded_json_does_not_execute():
+    from app.web import _published_embedded_html
+    assert _published_embedded_html("window.Page = FW.Models.Page.findOrCreate(alert('bad'))") == ""

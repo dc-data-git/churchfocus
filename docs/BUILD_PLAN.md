@@ -1,4 +1,4 @@
-# Church Search — BUILD_PLAN (Cursor handoff)
+# ChurchFocus — BUILD_PLAN (Cursor handoff)
 
 Clock: start ~12:45 pm CT. **Preliminary submission 10:00 pm CT** (code + 250-word description). Finalist submission 9:00 am MT Thu.
 Each person drives their own Cursor session on **their own files only** (avoids merge conflicts). Owner changes vs. the text below (tasks.json wins): T1.2 OSM → Wade; T6.2 results page → Katie; T7.3 report → Carter; new T7.4 deep-search routes → Daniel. Every Cursor prompt starts with:

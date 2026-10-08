@@ -61,4 +61,4 @@ def test_healthz_and_index():
     assert client.get("/healthz").json() == {"status": "ok"}
     resp = client.get("/")
     assert resp.status_code == 200
-    assert "Church Search" in resp.text
+    assert "ChurchFocus" in resp.text

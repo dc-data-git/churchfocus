@@ -25,9 +25,9 @@ def test_healthz(client):
 
 
 def test_index_serves_chat(client):
-    r = client.get("/")
+    r = client.get("/v1")
     assert r.status_code == 200
-    assert "Church Search" in r.text
+    assert "ChurchFocus" in r.text
     assert "chat" in r.text.lower() or "coming from" in r.text.lower() or "drive" in r.text.lower()
 
 
@@ -43,7 +43,7 @@ def test_chat_roundtrip(client, monkeypatch):
     )
     monkeypatch.setattr("app.llm.complete_json", fake.complete_json)
 
-    start = client.get("/")
+    start = client.get("/v1")
     assert start.status_code == 200
     # Pull session from page
     import re
@@ -51,7 +51,7 @@ def test_chat_roundtrip(client, monkeypatch):
     m = re.search(r'name="session_id"[^>]*value="([^"]+)"', start.text)
     assert m
     sid = m.group(1)
-    r = client.post("/api/chat", json={"session_id": sid, "text": "Hesston, KS, 15 miles"})
+    r = client.post("/v1/api/chat", json={"session_id": sid, "text": "Hesston, KS, 15 miles"})
     assert r.status_code == 200
     data = r.json()
     assert data["session_id"] == sid

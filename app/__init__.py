@@ -1,1 +1,1 @@
-"""Church Search application package."""
+"""ChurchFocus application package."""

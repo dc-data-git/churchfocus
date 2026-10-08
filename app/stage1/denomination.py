@@ -170,7 +170,7 @@ def _website_classify(name: str, website: str, kb) -> DenomGuess:
     return DenomGuess(denomination_id=None, label=label, confidence=min(conf, 0.7), method="website", evidence=evidence)
 
 
-def resolve(candidate: dict) -> DenomGuess:
+def resolve(candidate: dict, *, use_website: bool = True) -> DenomGuess:
     """Resolve denomination for a Places/OSM candidate (ARCHITECTURE §5 steps 1–5)."""
     kb = get_kb()
     name = candidate.get("name") or ""
@@ -221,14 +221,14 @@ def resolve(candidate: dict) -> DenomGuess:
             if locator.confidence > best.confidence:
                 best = locator
 
-    if website and best.confidence < 0.8:
+    if use_website and website and best.confidence < 0.8:
         site_guess = _website_classify(name, website, kb)
         if site_guess.confidence >= 0.8:
             return site_guess
         if site_guess.confidence > best.confidence:
             best = site_guess
 
-    if best.confidence < 0.8 and website:
+    if use_website and best.confidence < 0.8 and website:
         try:
             page = __import__("app.web", fromlist=["fetch"]).fetch(website, max_chars=8000)
             if NON_DENOM_TEXT.search(page.get("text") or ""):

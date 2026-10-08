@@ -44,3 +44,20 @@ Run three personas in the live app (`run.bat`). Log issues with severity (blocke
 | 3 Egalitarian (women pastors dealbreaker) | EVAL_PLAN §4 #3 | _pending_ | |
 | Edge: crisis phrase in chat | expect 988 card | _pending_ | |
 | Edge: stated vs observed (women preach) | report rows | _pending_ | |
+
+## Evening rebuild — Codex takeover
+Completed interface/report/question integration and real-model memory fixes. Final suite: 167 passed in the original Python 3.11 environment. Desktop/mobile fixture browser flow passed; live Places/website/capped deep dive and two-turn conversation passed. Details and limits: `docs/REBUILD_VERIFICATION.md`. W7 submission remains a separate team action.
+
+
+## October7: authorized repair design/implementation
+User authorized persistent AI instructions, six-role review, state tracking and implementation after discussion. Recorded REPAIR_PLAN/REPAIR_REVIEW/contracts; registered X0–X5 via CLI. Implemented durable job authorization/generation/pins, historical memory, broad medium/hero/fullstaff/source retrieval, broad deep/sermon persistence, small UI controls/progress. Full230tests, actual desktop/mobileAPIchecks and bounded realPlaces/websiteQA/deep-tool checks passed. Final QAcontext and serverrestart tracked in X5; see REPAIR_VERIFICATION for current status.
+
+Final verification:231tests passed65.35sec; completed10 actualAPI browser scenarios,12 mocked scenarios, boundedlivePlaces/medium/QA/deep-schema checks. SQLitebackup/noactivejobs; serverrestartedhealthy onexisting8000. X0–X5 done; no commit/publish/outreach. Open app pages should refresh. Researchbudget/sourceavailability and unexecuted longliveaudio check documented.
+
+User requested ChurchFocus name everywhere and background sharpening with deeper research. C1 registered; updated current app/docs/report/metadata/user agent identity, active prompt version, decorative native SVG scene tied to visible research state. No image dependencies or layout redesign.
+
+ChurchFocus C1 verified: 231 tests passed in 68.26 seconds. Browser verified title/header, six focus stages, partial report handling, reset, reduced motion and dark mobile layout with no page errors. Production had zero active research jobs; backed up before restart. Historical released prompts and stored conversation messages remain archival.
+
+C2 complete: recovered published embedded page/menu JSON without executing JavaScript or editor defaults. Verified live Conroe homepage Sunday10:30am, stated active small groups and staff Raymond McDonald/Senior Pastor. Shell-only responses marked extraction errors, not cached; rating withheld on failed coverage; versions invalidate failed old reuse. 233 tests pass. Server restarted with zero active research jobs. Runtime logs show model API credit exhaustion; fresh model summary remains unverified. Other reported issues unchanged.
+
+C4: deep_search.v5 activated with broken/incomplete YouTube evidence recovery, public-source identity verification, adaptive alternate routes, captions-first collection, varied samples and explicit failure limits. 241 tests pass in65.42s. Restarted with zero active research. No live broken-link recovery scenario run. Existing limits unchanged.

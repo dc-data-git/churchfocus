@@ -108,7 +108,10 @@ def build_questions_for_visit(
 
 def _narrative_sections(church: Church, profile: PreferenceProfile, report: ChurchReport) -> dict[str, Any]:
     prompt = load_prompt("report.v1")
+    from app import db
+    sources = db.research_sources(church.church_id)
     payload = {
+        "public_sources": [{"url": source["url"], "kind": source["kind"], "title": source["title"], "text": source["text"][:2500]} for source in sources[:30]],
         "church": church.model_dump(mode="json"),
         "match": report.match.model_dump(mode="json"),
         "settled": report.settled,
@@ -140,7 +143,7 @@ def log_path_for(session_id: str, church_id: str) -> str:
 def build_report(church: Church, profile: PreferenceProfile, ctx: dict[str, Any]) -> tuple[ChurchReport, dict[str, Any]]:
     kb = get_kb()
     match = score(church, profile, kb)
-    feature_ids = [p.feature for p in profile.preferences if _known_feature(p.feature)]
+    feature_ids = list(all_features())
     evidence = _filter_known_evidence(church.evidence or db_get_evidence(church.church_id))
     settled, open_f = settled_open(evidence, feature_ids)
     open_f = [f for f in open_f if _known_feature(f)]
@@ -168,6 +171,24 @@ def build_report(church: Church, profile: PreferenceProfile, ctx: dict[str, Any]
             if q not in merged:
                 merged.append(q)
         report = report.model_copy(update={"questions_for_visit": merged[:6]})
+    from app import qa
+    narrative["coverage"] = ctx.get("coverage", {})
+    narrative["limitations"] = ctx.get("limitations", [])
+    narrative["resources"] = ctx.get("resources", [])
+    narrative["sermons_analysed"] = ctx.get("sermons_analysed", 0)
+    narrative["your_questions"] = []
+    for q in qa.open_questions(profile.session_id, church.church_id):
+        from app.stage3.tools import cancelled
+        if cancelled(ctx):
+            break
+        if q["status"] == "dropped":
+            continue
+        a = qa.answer(profile.session_id, church.church_id, q["text"], record=False)
+        narrative["your_questions"].append({"text": q["text"], "answer": a["answer"], "sources": a["sources"], "confident": a["confident"]})
+        if a["confident"]:
+            qa.update_question(q["id"], status="answered")
+            from app import db
+            db.question_update(q["id"], answer=a["answer"])
     return report, narrative
 
 
@@ -197,7 +218,7 @@ def render_html(report: ChurchReport, *, narrative: dict[str, Any] | None = None
     env = _jinja_env()
     template = env.get_template("report.html")
     known_evidence = _filter_known_evidence(report.church.evidence)
-    feature_labels = {fid: feature(fid)["label"] for fid in report.settled + report.open if _known_feature(fid)}
+    feature_labels = {fid: meta["label"] for fid, meta in all_features().items()}
     return template.render(
         report=report,
         narrative=narrative,

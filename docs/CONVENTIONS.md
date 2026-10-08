@@ -1,4 +1,4 @@
-# Church Search — CONVENTIONS (inline in every Cursor task)
+# ChurchFocus — CONVENTIONS (inline in every Cursor task)
 
 **Read first:** `docs/INTERFACES.md` (names/signatures — do not invent new ones), `contracts/features.yaml` (the only feature vocabulary).
 

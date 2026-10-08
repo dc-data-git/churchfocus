@@ -1,4 +1,4 @@
-# Church Search — ARCHITECTURE
+# ChurchFocus — ARCHITECTURE
 
 ## 1. Stack (D16)
 Python 3.11+, FastAPI, Jinja2 + HTMX (no JS build step), SQLite, httpx, pydantic v2, PyYAML, rapidfuzz, feedparser, trafilatura (HTML→text), pypdf, `mcp` (Python SDK) for the denomination server. Background jobs: a thread pool inside the app (`concurrent.futures`), job state in SQLite. No Docker required.

@@ -1,6 +1,6 @@
 # AGENTS.md — for Cursor and any coding agent
 
-This repo is **Church Search** (Gloo AI Hackathon 2026, Track 1). Before writing code:
+This repo is **ChurchFocus** (Gloo AI Hackathon 2026, Track 1). Before writing code:
 1. Read `docs/CONVENTIONS.md` (rules + definition of done).
 2. Use names from `docs/INTERFACES.md` only.
 3. Use feature ids from `contracts/features.yaml` only.

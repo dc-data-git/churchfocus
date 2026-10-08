@@ -1,0 +1,85 @@
+{
+  "tasks": [
+    {
+      "id": "X0",
+      "owner": "root",
+      "title": "Design, six-role review and persistent task contracts",
+      "depends_on": [],
+      "status": "done",
+      "note": "Six-role review incorporated; contracts published",
+      "updated": "2026-10-07"
+    },
+    {
+      "id": "X1",
+      "owner": "root",
+      "title": "Session memory, authorization, cancellation and truthful actions",
+      "depends_on": [
+        "X0"
+      ],
+      "status": "in_progress",
+      "note": "Implementation assigned; acceptance in REPAIR_PLAN.md",
+      "updated": "2026-10-07"
+    },
+    {
+      "id": "X2",
+      "owner": "backend_testing_review",
+      "title": "Broad factual medium collection and source-backed QA",
+      "depends_on": [
+        "X0"
+      ],
+      "status": "in_progress",
+      "note": "Implementation assigned; acceptance in REPAIR_PLAN.md",
+      "updated": "2026-10-07"
+    },
+    {
+      "id": "X3",
+      "owner": "senior_project_review",
+      "title": "Deep coverage and reusable sermon corpus",
+      "depends_on": [
+        "X0"
+      ],
+      "status": "in_progress",
+      "note": "Implementation assigned; acceptance in REPAIR_PLAN.md",
+      "updated": "2026-10-07"
+    },
+    {
+      "id": "X4",
+      "owner": "ui_frontend_review",
+      "title": "Selection, pins and visible progress with existing UI",
+      "depends_on": [
+        "X0"
+      ],
+      "status": "in_progress",
+      "note": "Implementation assigned; acceptance in REPAIR_PLAN.md",
+      "updated": "2026-10-07"
+    },
+    {
+      "id": "X5",
+      "owner": "root",
+      "title": "Integration, regression and browser verification",
+      "depends_on": [
+        "X1",
+        "X2",
+        "X3",
+        "X4"
+      ],
+      "status": "todo",
+      "note": "",
+      "updated": "2026-10-07"
+    }
+  ],
+  "milestones": [
+    {
+      "id": "X-MVP",
+      "target": "repair verified",
+      "needs": [
+        "X0",
+        "X1",
+        "X2",
+        "X3",
+        "X4",
+        "X5"
+      ]
+    }
+  ]
+}

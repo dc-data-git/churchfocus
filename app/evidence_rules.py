@@ -24,8 +24,23 @@ def allowed_values(fid: str) -> set[str]:
     return {str(v) for v in all_features()[fid]["values"]} | ALWAYS_ALLOWED
 
 
+PLACEHOLDERS = {"miles", "schedule", "language_list", "ministry_list", "topic_list", "denomination_id", "network_name",
+                "names_roles_tenure", "change_list", "report_list", "stated_position_text", "percent"}
+
+
+def is_free_form(fid: str) -> bool:
+    return bool({str(v) for v in all_features()[fid]["values"]} & PLACEHOLDERS)
+
+
 def value_ok(fid: str, value: str) -> bool:
-    return fid in all_features() and str(value) in allowed_values(fid)
+    """Enumerated features: one of the allowed values. Free-form features (schedule, lists, text): the actual content,
+    never the placeholder word itself (U18)."""
+    if fid not in all_features():
+        return False
+    v = str(value).strip()
+    if is_free_form(fid):
+        return bool(v) and v not in PLACEHOLDERS and len(v) <= 300
+    return v in allowed_values(fid)
 
 
 def marriage_rule_violation(fid: str, value: str, quote: str) -> str | None:

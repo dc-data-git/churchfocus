@@ -32,7 +32,7 @@ CRISIS_KEYWORDS = re.compile(
 )
 CRISIS_MESSAGE = (
     "It sounds like you may be going through something very difficult right now. "
-    "Church Search can't provide crisis or pastoral care, but help is available. "
+    "ChurchFocus can't provide crisis or pastoral care, but help is available. "
     "Please call or text 988 (Suicide & Crisis Lifeline) or reach out to someone you trust. "
     "If you are in immediate danger, call 911."
 )

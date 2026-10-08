@@ -140,7 +140,7 @@ def test_light_search_sorted_and_resolves(wired_search, kb):
     assert any(c.denomination.denomination_id for c, _ in results)
 
 
-def test_light_search_excludes_dealbreaker_violator(wired_search, monkeypatch, kb):
+def test_light_search_keeps_practice_dealbreaker_violator_at_low_fit(wired_search, monkeypatch, kb):
     real_resolve = denomination.resolve
 
     def fake_resolve(candidate):
@@ -173,6 +173,7 @@ def test_light_search_excludes_dealbreaker_violator(wired_search, monkeypatch, k
         preferences=[Preference(feature="women.senior_pastor", want=["yes"], weight="dealbreaker")],
     )
     results = denomination.light_search(profile)
-    names = [c.name for c, _ in results]
-    assert "Holy Cross Catholic Church" not in names
-    assert all(not mr.excluded for _, mr in results)
+    by = {c.name: mr for c, mr in results}
+    assert "Holy Cross Catholic Church" in by                       # D28: kept…
+    assert by["Holy Cross Catholic Church"].fit in ("poor", "unlikely")   # …but at low fit
+    assert results[-1][0].name == "Holy Cross Catholic Church" or by["Holy Cross Catholic Church"].score < 50

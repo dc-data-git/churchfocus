@@ -28,7 +28,7 @@
   {% if profile and profile.max_miles %} · within {{ profile.max_miles }} miles{% endif %}
 </p>
 
-<form id="medium-form" hx-post="/api/medium" hx-target="#cards-area" hx-swap="innerHTML">
+<form id="medium-form" hx-post="/v1/api/medium" hx-target="#cards-area" hx-swap="innerHTML">
   <input type="hidden" name="session_id" value="{{ session_id }}">
   <ul class="church-list">
     {% for row in results %}

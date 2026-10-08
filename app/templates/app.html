@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ChurchFocus</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="app">
+  <section class="chat" aria-label="Conversation" data-focus-stage="0">
+    <div class="focus-scene" aria-hidden="true"></div>
+    <header class="top"><span class="logo">✝</span> ChurchFocus <button type="button" class="newchat" onclick="csNewChat()">New chat</button></header>
+    <div id="thread" class="thread" aria-live="polite"></div>
+    <div id="jobs" class="jobs" aria-live="polite" aria-label="Research status"></div>
+    <form id="composer" class="composer" autocomplete="off">
+      <textarea id="input" rows="1" placeholder="Message ChurchFocus…" aria-label="Your message"></textarea>
+      <button id="send" type="submit" aria-label="Send">↑</button>
+    </form>
+  </section>
+  <aside class="side" aria-label="Details">
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="churches" class="active">Churches</button>
+      <button role="tab" data-tab="about">About you</button>
+      <button role="tab" data-tab="questions">Open questions</button>
+    </nav>
+    <div class="panel" id="panel-churches">
+      <div class="controls">
+        <label>Within <select id="radius"><option>5</option><option>10</option><option selected>15</option><option>25</option><option>35</option><option>50</option></select> mi</label>
+        <label>Sort <select id="sort"><option value="fit">Best fit</option><option value="distance">Distance</option><option value="name">Name</option></select></label>
+        <label>Show <select id="size"><option>10</option><option>20</option><option>50</option></select></label>
+      </div>
+      <p id="discovery" class="muted" role="status"></p>
+      <div id="churches" class="churches"><p class="muted">Tell me where you're starting from and I'll start looking.</p></div>
+      <div class="pager"><button id="prev">‹</button><span id="pageinfo"></span><button id="next">›</button></div>
+      <button id="knowmore" class="primary">Learn more</button>
+      <div id="selection" class="hidden">
+        <p class="hint">Choose 1–5 churches to learn more about.</p>
+        <p id="selectioncount" class="hint" role="status">0 selected (choose 1–5)</p>
+        <button id="submitselection" class="primary" disabled>Research selected</button>
+      </div>
+      <p class="attribution">Church names, addresses and locations from Google Maps.</p>
+    </div>
+    <div class="panel hidden" id="panel-about"><div id="about"><p class="muted">What I learn about what you're looking for shows up here. You can edit anything.</p></div></div>
+    <div class="panel hidden" id="panel-questions"><button type="button" id="addquestion" class="primary">Add a question</button><div id="questions"><p class="muted">Questions I couldn't answer yet will show up here, per church.</p></div></div>
+  </aside>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>

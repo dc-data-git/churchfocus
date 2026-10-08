@@ -28,7 +28,7 @@
   <div id="options-area" class="options"></div>
 
   <form id="chat-form"
-        hx-post="/api/chat"
+        hx-post="/v1/api/chat"
         hx-swap="none"
         hx-ext="json-enc"
         hx-headers='{"Accept": "application/json"}'
@@ -124,7 +124,7 @@
     const btn = document.getElementById('confirm-btn');
     btn.disabled = true;
     status.classList.remove('hidden');
-    fetch('/api/profile/confirm', {
+    fetch('/v1/api/profile/confirm', {
       method: 'POST',
       headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
       body: JSON.stringify({session_id: sid})
@@ -134,7 +134,7 @@
     })
     .then(function () {
       status.textContent = 'Searching nearby churches… this can take up to a minute.';
-      return fetch('/api/search', {
+      return fetch('/v1/api/search', {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
         body: JSON.stringify({session_id: sid})
@@ -144,7 +144,7 @@
       return r.json().then(function (d) { if (!r.ok) { throw new Error(d.message || 'Search failed.'); } return d; });
     })
     .then(function () {
-      window.location.href = '/results/' + sid;
+      window.location.href = '/v1/results/' + sid;
     })
     .catch(function (err) {
       status.textContent = (err && err.message) ? err.message : 'Search failed — try again.';
@@ -153,7 +153,7 @@
   });
 
   {% if not initial_say %}
-  fetch('/api/chat', {
+  fetch('/v1/api/chat', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({session_id: sessionInput.value || null, text: null})

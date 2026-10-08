@@ -9,13 +9,14 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import urljoin, urlparse
 
 import feedparser
 import httpx
 import imageio_ffmpeg
 
+from app.features import feature
 from app.config import get_settings
 from app.llm import complete_json, load_prompt, transcribe as llm_transcribe
 from app.models import Church, Evidence, now
@@ -238,6 +239,9 @@ def get_sermons(
 ) -> dict[str, Any]:
     """Parse a sermon RSS/Atom feed; return items newest first."""
     cap = min(limit or get_settings().deep_max_sermons, get_settings().deep_max_sermons)
+    if "youtube" in (urlparse(feed_url).hostname or "") or urlparse(feed_url).hostname == "youtu.be":
+        from app.web import youtube_videos
+        return {"feed_url": feed_url, **youtube_videos(feed_url, cap)}
     if feed_text is None:
         feed_text = _fetch_feed_text(feed_url)
         if feed_text is None:
@@ -435,6 +439,18 @@ def transcribe_sermon(
         )
         return {"text": item["text"], "minutes": minutes, "speaker": speaker, "source": "item"}
 
+    video_url = item.get("video_url") or item.get("page_url")
+    from app.web import youtube_video_id, youtube_captions
+    if video_url and youtube_video_id(video_url):
+        try:
+            result = youtube_captions(video_url)
+            if result.get("text"):
+                log_throughput(church_id=church_id, sermon_title=title, audio_minutes=result["minutes"], wall_ms=int((time.perf_counter()-t0)*1000), action="youtube_captions")
+                return {**result, "speaker": speaker}
+        except Exception as exc:
+            if not item.get("audio_url") and not item.get("transcript_url"):
+                return {"text": "", "minutes": 0, "speaker": speaker, "source": "youtube_captions_failed", "error": type(exc).__name__}
+
     transcript_url = item.get("transcript_url")
     if transcript_url:
         text = _fetch_transcript(transcript_url)
@@ -498,7 +514,7 @@ def transcribe_sermons_parallel(
 
 
 def _analyse_one_sermon(text: str, metadata: dict[str, Any]) -> dict[str, Any]:
-    prompt = load_prompt("sermon_analyse.v2")
+    prompt = load_prompt("sermon_analyse.v3")
     user = {
         "metadata": metadata,
         "transcript": text[:50_000],
@@ -599,6 +615,7 @@ def analyse_sermons(
     features: list[str],
     *,
     church_id: str | None = None,
+    cancelled: Callable[[], bool] | None = None,
 ) -> dict[str, Any]:
     """Run sermon_analyse.v1 per sermon and aggregate observed tier-D Evidence."""
     t0 = time.perf_counter()
@@ -607,10 +624,13 @@ def analyse_sermons(
 
     analyses: list[dict[str, Any]] = []
     for entry in texts:
+        if cancelled and cancelled():
+            break
         text = entry.get("text") or ""
         if not text.strip():
             continue
         metadata = {
+            "feature_vocabulary": {fid: {"label": feature(fid)["label"], "values": feature(fid)["values"]} for fid in features},
             "title": entry.get("title", ""),
             "speaker": entry.get("speaker", ""),
             "minutes": entry.get("minutes"),
@@ -618,10 +638,12 @@ def analyse_sermons(
             "url": entry.get("page_url") or entry.get("url") or "",
         }
         analysis = _analyse_one_sermon(text, metadata)
+        if cancelled and cancelled():
+            break
         analysis.setdefault("speaker_gender", entry.get("speaker_gender", "unknown"))
         analyses.append(analysis)
 
-    evidence = _aggregate_evidence(analyses, features)
+    evidence = [] if cancelled and cancelled() else _aggregate_evidence(analyses, features)
     wall_ms = int((time.perf_counter() - t0) * 1000)
     audio_minutes = sum(float(a.get("minutes") or 0) for a in analyses)
     log_throughput(

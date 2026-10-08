@@ -39,6 +39,7 @@ class Settings:
     deep_max_sermons: int
     cache_max_age_days: int
     user_agent: str
+    tools_reasoning_effort: str
 
 
 @lru_cache
@@ -61,5 +62,6 @@ def get_settings() -> Settings:
         deep_max_tool_calls=int(e("DEEP_MAX_TOOL_CALLS", "150")),
         deep_max_sermons=int(e("DEEP_MAX_SERMONS", "25")),
         cache_max_age_days=int(e("CACHE_MAX_AGE_DAYS", "30")),
-        user_agent=e("USER_AGENT", "ChurchSearch/0.1 (hackathon research tool)"),
+        tools_reasoning_effort=e("TOOLS_REASONING_EFFORT", "none"),
+        user_agent=e("USER_AGENT", "ChurchFocus/0.1 (hackathon research tool)").replace("ChurchSearch", "ChurchFocus"),
     )

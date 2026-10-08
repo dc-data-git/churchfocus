@@ -17,3 +17,33 @@ v2 adds `speaker_gender` (female|male|unknown) taken only from the speaker's nam
 ## deep_search.v1 → v2 (2026-10-07, code review R6/R10)
 v1 told the agent to record sermon observations itself as tier D and, when a quote failed the verbatim check, to "record the item as tier D inferred". That let the agent settle sensitive features (e.g. women.preach = never) with no analysis behind them. It also named a single-sermon tool that made the model copy whole transcripts into tool arguments (context overflow, truncated JSON).
 v2: sermon workflow by sermon_id (find → get → transcribe_sermons → analyse_sermons, which records its own evidence); record_evidence takes tiers A/B/C only, "unstated" allowed; failed quotes leave the feature open; tools may return errors to adapt to; the latest CURRENT STATE message replaces earlier ones.
+
+## interviewer.v1 → interview_skill.v1 (2026-10-07, live testing U1-U11, D26-D27)
+interviewer.v1 drove a fixed ladder of questions and asked the person to pick want / avoid / doesn't matter for each. Live testers said there were too many questions, it felt like a form, and asking about women in leadership and marriage "led the witness" (B1).
+interview_skill.v1 is open-ended: one invitation to say what matters, 0-3 follow-ups, never raises belief topics first, never asks for want/avoid or a rating. The model infers memory ops (key, val, stance, strength, conf, src, ev, why) from everything said; the server validates them against features.yaml and the scoring reads them through fixed rules (memory.to_profile).
+
+## page_extract.v1 → v2 (2026-10-07, live testing U18-U20)
+v1 stored the placeholder word for free-form features (e.g. `language_list` instead of the languages), picked short fragments as quotes, and inferred multisite from a livestream. v2 returns the actual content for free-form features, asks for the best full-sentence quote, forbids the livestream inference, and keeps the marriage rule. Stage 2 now asks each page only for the person's features plus identity basics.
+
+## New small prompts (2026-10-07, v2)
+denom_answer, church_highlights, church_qa, memory_edit are inline system prompts in conversation.py / jobs.py / qa.py: each answers ONLY from the JSON facts given; church_qa sources are re-checked verbatim before an answer counts as confident.
+
+## interview_skill.v2 (Oct 7 rebuild verification)
+The v1 output accepted a single denomination reference, so comparison questions could only summarize one group. v2 permits two references and routes their comparison through the KB. The original v1 is preserved.
+
+## interview_skill.v3 (live verification)
+The real model returned `op: add`; valid preferences were dropped because MemoryOp accepts `assert`. v3 spells out the operation enum, the structured schema now includes full MemoryOp items, and the server normalizes the observed add synonym. Regression and real-model checks cover preference retention.
+
+
+## October 7 reviewed repair
+- interview_skill.v4: About-you current view plus history/reasons, Christianese clarification, no invented criteria or repeated questions; explicit medium authorization and reset off-ramp; unique church references and truthful launch acknowledgements. Supersedes v3 automatic-medium flow.
+- medium_extract.v1: broad factual baseline/full public staff and roles, active ministry existence, precisely sourced excerpts, resource catalog, independent of current preferences. Replaces medium use of page_extract.v2; faith text retained for later retrieval.
+- deep_search.v3: minimum thematic coverage plus adaptive nine tactics, rich sermons central, public reusable corpus, questions additional, broad no-preference scope, budgets/cancellation/gaps. Supersedes v2 preference-only stopping.
+- sermon_analyse.v3: all-feature teaching scope; forbid name/photo-based gender inference; preserve source metadata and sourced sermon observations. Supersedes v2.
+
+## ChurchFocus brand
+interview_skill.v5 supersedesv4 solely for the ChurchFocus product identity; research/memory behavior unchanged. Released archives retained for audit.
+
+Deep_search.v4 adds explicit YouTube caption workflow and full-service vs sermon distinction; v3 lacked supported video retrieval.
+
+Deep_search.v5 supersedes v4: broken/incomplete channel hints require adaptive public source recovery; explicit identity verification, recent varied recording discovery, real-caption attempts, bounded retries and truthful incomplete-coverage reporting. v4 supported direct YouTube retrieval but lacked recovery instructions. Released v4 preserved.

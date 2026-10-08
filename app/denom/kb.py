@@ -21,6 +21,10 @@ from ..models import Evidence, PreferenceProfile
 
 NON_CHRISTIAN = re.compile(r"\b(Muslim|Islam|Judaism|Jewish|Hindu|Buddhis|Baha'?i|Sikh|Jain|Zoroastrian|Taoist|Shinto|"
                            r"Unitarian|Vajarayana|Theravada|Mahayana|Yoga)", re.I)
+# D29: groups outside historic Trinitarian (Nicene) Christianity are removed from the app entirely.
+NON_NICENE_IDS = {"lds", "jw", "usrc2020_e54"}
+NON_NICENE_NAME = re.compile(r"latter[- ]?day|\bLDS\b|jehovah|kingdom hall|christian scien|church of christ,? scientist|"
+                             r"unitarian|united pentecostal|oneness|christadelphian|unity church|community of christ", re.I)
 NOT_APPLICABLE = re.compile(r"^\s*not applicable", re.I)
 VARIES = re.compile(r"\b(varies|vary|not uniform|differ(s|ing)? (by|from|across)|no single|not explicitly stated)\b", re.I)
 
@@ -128,10 +132,14 @@ class DenomKB:
 
     # ---------------------------------------------------------------- lookup
     def is_christian(self, gid: str) -> bool:
+        """Christian AND within historic Trinitarian (Nicene) Christianity (D29). Everything else is never suggested."""
         g = self.groups[gid]
+        names = g["census_name"] + " " + g["name"]
+        if gid in NON_NICENE_IDS or NON_NICENE_NAME.search(names):
+            return False
         if gid in self.curated:
-            return self.curated[gid].get("branch") != "non_christian"
-        return not NON_CHRISTIAN.search(g["census_name"] + " " + g["name"])
+            return self.curated[gid].get("branch") not in ("non_christian", "restorationist") or gid not in ("lds", "jw")
+        return not NON_CHRISTIAN.search(names)
 
     def _size_boost(self, gid: str) -> float:
         a = self.groups[gid]["census_2020"].get("adherents") or 0
@@ -173,6 +181,7 @@ class DenomKB:
                                  key=lambda gid: -(self.groups[gid]["census_2020"].get("adherents") or 0))[:3]
                     for gid in fam:
                         scores[gid] = max(scores.get(gid, 0), 70.0)
+        scores = {gid: sc for gid, sc in scores.items() if gid not in NON_NICENE_IDS}   # D29
         ranked = sorted(scores.items(), key=lambda kv: -(kv[1] + self._size_boost(kv[0])))
         return [{"id": gid, "name": self.groups[gid]["name"], "score": round(s, 1)} for gid, s in ranked[:k]]
 

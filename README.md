@@ -1,4 +1,4 @@
-# Church Search
+# ChurchFocus
 
 On-demand church research for people finding a church for themselves or someone else (Gloo AI Hackathon 2026, Track 1).
 

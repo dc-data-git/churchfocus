@@ -1,4 +1,4 @@
-# Church Search: shared feature vocabulary (features.v2)
+# ChurchFocus: shared feature vocabulary (features.v2)
 #
 # THE CONTRACT. One list of features that every part of the app reads and writes:
 #   Stage 0 conversation      -> preference profile  {feature: {want: [values], weight}}

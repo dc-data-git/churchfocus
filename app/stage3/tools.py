@@ -7,9 +7,9 @@ import time
 from typing import Any
 
 import httpx
-from rapidfuzz import fuzz
 
 from app import db
+from app.config import get_settings
 from app.denom.kb import get_kb
 from app.features import all_features, feature, settled_open
 from app.log import write_step
@@ -20,8 +20,50 @@ from app.stage3 import sermons
 from app.evidence_rules import marriage_rule_violation, value_ok
 from app.web import Blocked, fetch
 
+COVERAGE_AREAS = {
+    "identity_governance": "Identity, affiliation, governance and networks",
+    "public_staff": "Full publicly listed staff names and positions",
+    "services_worship": "Service schedules, formats and worship practices",
+    "ministries_community": "Active ministries, small-group ministry and community work",
+    "stated_beliefs": "Published faith and mission statements",
+    "sermon_teaching": "Reusable sermon collection and teaching analysis",
+    "history_public_context": "History, leadership changes and relevant public reporting",
+}
+
+
+def cancelled(ctx: dict) -> bool:
+    from app.jobs import is_cancelled
+    try:
+        return is_cancelled(ctx["job_id"])
+    except KeyError:
+        return False
+
+
+def review_coverage(ctx: dict, area: str, status: str, summary: str, urls: list[str] | None = None) -> dict:
+    """Record investigation coverage separately from feature evidence."""
+    if area not in COVERAGE_AREAS or status not in {"supported", "partial", "not_found"}:
+        return {"error": "Unknown coverage area/status"}
+    urls = list(dict.fromkeys(urls or []))
+    if status == "supported" and (not urls or any(u not in ctx.get("fetched_texts", {}) for u in urls)):
+        return {"error": "Supported coverage requires fetched source URLs"}
+    if area == "public_staff" and status == "supported":
+        for url in urls:
+            text = ctx.get("fetched_texts", {}).get(url, "")
+            if len(text) > MODEL_TEXT_CHARS:
+                end = 0
+                for a, b in sorted(ctx.get("source_views", {}).get(url, [])):
+                    if a > end:
+                        break
+                    end = max(end, b)
+                if end < len(text):
+                    return {"error": "Full staff coverage requires inspecting remaining source chunks with read_source", "url": url, "next_offset": end, "total_chars": len(text)}
+    ctx["coverage"][area] = {"status": status, "summary": summary, "urls": urls}
+    _log_tool(ctx, action="review_coverage", why=ctx.pop("_tool_why", ""), input={"area": area, "status": status}, result_summary=summary)
+    return {"ok": True, "coverage": ctx["coverage"][area]}
+
+
 _VERBATIM_THRESHOLD = 90
-MODEL_TEXT_CHARS = 4000     # R6: what the model sees per page; full text stays in ctx for quote checks
+MODEL_TEXT_CHARS = 12000     # R6: what the model sees per page; full text stays in ctx for quote checks
 MODEL_LINKS = 30
 
 
@@ -33,9 +75,7 @@ def quote_verbatim(quote: str, page_text: str, threshold: int = _VERBATIM_THRESH
     q, t = _norm(quote), _norm(page_text)
     if len(q) < 12:
         return False
-    if q in t:
-        return True
-    return fuzz.partial_ratio(q, t) >= threshold
+    return q in t
 
 
 def make_ctx(
@@ -52,6 +92,8 @@ def make_ctx(
         "job_id": job_id,
         "profile": profile,
         "church": church,
+        "coverage": {a: {"status": "unresearched", "summary": "", "urls": []} for a in COVERAGE_AREAS},
+        "resources": [], "limitations": [],
         "step": 0,
         "fetched_texts": {},
         "escalations": [],
@@ -88,7 +130,7 @@ def _log_tool(
             stage=3,
             step=_next_step(ctx),
             action=action,
-            why=why or "",
+            why=why or "Research lifecycle or coverage update",
             input=input,
             result_summary=result_summary,
             features_moved=features_moved or [],
@@ -102,14 +144,28 @@ def _track_fetched(ctx: dict[str, Any], url: str, text: str) -> None:
         ctx.setdefault("fetched_texts", {})[url] = text
 
 
+def read_source(ctx: dict, url: str, query: str = "", offset: int = 0) -> dict:
+    """Read a bounded portion of a persisted source without fetching again."""
+    if cancelled(ctx):
+        return {"cancelled": True}
+    text = ctx.get("fetched_texts", {}).get(url)
+    if text is None:
+        return {"error": "Source has not been fetched or saved for this church"}
+    offset = max(0, int(offset))
+    if query:
+        pos = text.lower().find(query.lower(), offset)
+        if pos < 0:
+            return {"url": url, "text": "", "not_found": True, "total_chars": len(text)}
+        offset = max(0, pos - 500)
+    end = min(len(text), offset + MODEL_TEXT_CHARS)
+    ctx.setdefault("source_views", {}).setdefault(url, []).append((offset, end))
+    _log_tool(ctx, action="read_source", why=ctx.pop("_tool_why", ""), input={"url": url, "query": query, "offset": offset}, result_summary=f"Read characters {offset}–{end} of {len(text)}")
+    return {"url": url, "text": text[offset:end], "offset": offset, "next_offset": end, "total_chars": len(text), "truncated": end < len(text)}
+
+
 def _source_text_for_quote(ctx: dict[str, Any], url: str, quote: str) -> str | None:
-    texts = ctx.get("fetched_texts", {})
-    if url and url in texts:
-        return texts[url]
-    for text in texts.values():
-        if quote_verbatim(quote, text):
-            return text
-    return None
+    return ctx.get("fetched_texts", {}).get(url)
+
 
 
 def _profile_feature_ids(ctx: dict[str, Any]) -> list[str]:
@@ -155,8 +211,20 @@ def fetch_page(ctx: dict[str, Any], url: str) -> dict:
     t0 = time.perf_counter()
     why = ctx.pop("_tool_why", "")
     try:
-        page = fetch(url)
+        if cancelled(ctx):
+            return {"cancelled": True}
+        if re.search(r"(?:^|[/_-])(calendar|events?)(?:[/_.?=-]|$)", url, re.I):
+            ctx.setdefault("resources", []).append({"kind": "calendar", "url": url})
+            return {"url": url, "text": "", "links": [], "resource_only": True, "note": "Calendar entries are outside deep research; retained for targeted questions."}
+        page = fetch(url, max_chars=100000, max_age_days=30)
+        if cancelled(ctx):
+            return {"cancelled": True}
+        if not page.get("from_cache"):
+            ctx["sources_refreshed"] = True
+        if page.get("text") and page.get("status", 200) == 200:
+            db.research_put(ctx["church_id"], page.get("url", url), page["text"], scope="deep", checked_at=page.get("checked_at"))
         _track_fetched(ctx, page.get("url", url), page.get("text", ""))
+        ctx.setdefault("source_views", {}).setdefault(page.get("url", url), []).append((0, min(len(page.get("text", "")), MODEL_TEXT_CHARS)))
         ms = int((time.perf_counter() - t0) * 1000)
         _log_tool(
             ctx,
@@ -178,6 +246,9 @@ def _for_model(page: dict) -> dict:
     text = page.get("text") or ""
     out = {k: page.get(k) for k in ("url", "status", "error") if page.get(k) is not None}
     out["text"] = text[:MODEL_TEXT_CHARS] + (f"\n…[truncated; {len(text)} chars total]" if len(text) > MODEL_TEXT_CHARS else "")
+    out["total_chars"] = len(text)
+    out["next_offset"] = min(len(text), MODEL_TEXT_CHARS)
+    out["truncated"] = len(text) > MODEL_TEXT_CHARS
     out["links"] = [{"href": l.get("href"), "text": (l.get("text") or "")[:60]} for l in (page.get("links") or [])[:MODEL_LINKS]]
     return out
 
@@ -185,6 +256,8 @@ def _for_model(page: dict) -> dict:
 def search_web(ctx: dict[str, Any], query: str) -> dict:
     t0 = time.perf_counter()
     why = ctx.pop("_tool_why", "")
+    if cancelled(ctx):
+        return {"cancelled": True}
     results = llm_web_search(query)
     ms = int((time.perf_counter() - t0) * 1000)
     _log_tool(
@@ -306,15 +379,19 @@ def get_sermons(ctx: dict[str, Any], feed_url: str, limit: int = 25) -> dict:
     """Parse a feed; items are stored in ctx and returned to the model as sermon_ids (no copying of data)."""
     t0 = time.perf_counter()
     why = ctx.pop("_tool_why", "")
-    result = sermons.get_sermons(feed_url, limit)
+    result = sermons.get_sermons(feed_url, min(limit, get_settings().deep_max_sermons))
     items = result.get("items", [])
     store = ctx.setdefault("sermon_items", {})
     listing = []
     for it in items:
         sid = f"s{len(store) + 1}"
         store[sid] = it
+        source_url = it.get("page_url") or it.get("transcript_url") or it.get("audio_url")
+        saved = next((v for v in ctx.get("saved_sources", []) if v.get("kind") == "sermon" and v.get("url") == source_url), None)
+        if saved:
+            ctx.setdefault("transcripts", {})[sid] = {**saved, "page_url": saved["url"]}
         listing.append({"sermon_id": sid, "title": it.get("title", "")[:100], "date": it.get("date", "")[:10],
-                        "speaker": it.get("speaker", ""), "has_audio": bool(it.get("audio_url")),
+                        "speaker": it.get("speaker", ""), "has_audio": bool(it.get("audio_url")), "has_video": bool(it.get("video_url")),
                         "has_transcript": bool(it.get("transcript_url") or it.get("text"))})
     _log_tool(ctx, action="get_sermons", why=why, input={"feed_url": feed_url, "limit": limit},
               result_summary=f"{len(items)} items" + (f" ({result['error']})" if result.get("error") else ""),
@@ -331,11 +408,13 @@ def transcribe_sermons(ctx: dict[str, Any], sermon_ids: list[str]) -> dict:
     t0 = time.perf_counter()
     why = ctx.pop("_tool_why", "")
     store, done = ctx.setdefault("sermon_items", {}), ctx.setdefault("transcripts", {})
-    room = max(0, get_settings().deep_max_sermons - len(done))
+    room = max(0, get_settings().deep_max_sermons - len({v.get("page_url") or key for key, v in done.items()}))
     todo = [sid for sid in dict.fromkeys(sermon_ids) if sid in store and sid not in done][:room]
     skipped = [sid for sid in sermon_ids if sid not in todo and sid not in done]
 
     def work(sid: str) -> tuple[str, dict]:
+        if cancelled(ctx):
+            return sid, {"text": "", "source": "cancelled"}
         try:
             return sid, sermons.transcribe_sermon(store[sid], church_id=ctx.get("church_id"))
         except Exception as e:   # one bad download must not kill the batch
@@ -345,9 +424,14 @@ def transcribe_sermons(ctx: dict[str, Any], sermon_ids: list[str]) -> dict:
     with ThreadPoolExecutor(max_workers=3) as pool:
         for sid, r in pool.map(work, todo):
             item = store[sid]
+            if cancelled(ctx):
+                break
             if r.get("text"):
+                ctx["sources_refreshed"] = True
+                source_url = item.get("page_url") or item.get("transcript_url") or item.get("audio_url") or f"sermon:{sid}"
+                db.research_put(ctx["church_id"], source_url, r["text"], scope="deep", kind="sermon", title=item.get("title", ""), speaker=r.get("speaker") or item.get("speaker", ""), published_at=item.get("date", ""))
                 done[sid] = {**r, "title": item.get("title", ""), "date": item.get("date", ""),
-                             "speaker": r.get("speaker") or item.get("speaker", ""), "page_url": item.get("page_url", "")}
+                             "speaker": r.get("speaker") or item.get("speaker", ""), "page_url": source_url}
                 _track_fetched(ctx, item.get("page_url") or f"sermon:{sid}", r["text"])
             results.append({"sermon_id": sid, "minutes": round(float(r.get("minutes") or 0), 1),
                             "chars": len(r.get("text") or ""), "source": r.get("source"), **({"error": r["error"]} if r.get("error") else {})})
@@ -374,11 +458,21 @@ def analyse_sermons(ctx: dict[str, Any], sermon_ids: list[str] | None = None, fe
     t0 = time.perf_counter()
     why = ctx.pop("_tool_why", "")
     done = ctx.get("transcripts", {})
-    ids = [sid for sid in (sermon_ids or list(done)) if sid in done]
+    ids = []
+    seen_urls = set()
+    for sid in (sermon_ids or list(done)):
+        if sid not in done:
+            continue
+        url = done[sid].get("page_url") or sid
+        if url not in seen_urls:
+            ids.append(sid)
+            seen_urls.add(url)
     analysed = set(ctx.setdefault("analysed_ids", []))
-    feats = [f for f in (features or list(_SERMON_FEATURES)) if f in all_features()] or list(_SERMON_FEATURES)
+    feats = [f for f in (features or list(all_features())) if f in all_features()] or list(_SERMON_FEATURES)
     texts = [{**done[sid], "sermon_id": sid} for sid in ids]
-    result = sermons.analyse_sermons(texts, list(set(feats) | _SERMON_FEATURES), church_id=ctx.get("church_id"))
+    result = sermons.analyse_sermons(texts, list(set(feats) | _SERMON_FEATURES), church_id=ctx.get("church_id"), cancelled=lambda: cancelled(ctx))
+    if cancelled(ctx):
+        return {"cancelled": True}
     ctx["analysed_ids"] = sorted(analysed | set(ids))
     ctx["sermons_analysed"] = len(ctx["analysed_ids"])
 
@@ -394,7 +488,7 @@ def analyse_sermons(ctx: dict[str, Any], sermon_ids: list[str] | None = None, fe
                 stated.append(Evidence(feature=fid, value=val, tier="A", how="stated", source_kind="sermon_transcript",
                                        quote=quote[:300], url=src.get("page_url") or "", note=f"sermon: {src.get('title', '')[:80]}"))
     new = observed + [e for e in stated if e.url]
-    if new:
+    if new and not cancelled(ctx):
         db.add_evidence(ctx["church_id"], new)
         ctx.setdefault("sermon_evidence", []).extend(observed)
         church = ctx.get("church")
@@ -412,6 +506,8 @@ def analyse_sermons(ctx: dict[str, Any], sermon_ids: list[str] | None = None, fe
 def record_evidence(ctx: dict[str, Any], evidence: list) -> dict:
     t0 = time.perf_counter()
     why = ctx.pop("_tool_why", "")
+    if cancelled(ctx):
+        return {"cancelled": True}
     accepted, errors = _validate_evidence_items(evidence)
     if errors and not accepted:
         ms = int((time.perf_counter() - t0) * 1000)
@@ -519,6 +615,12 @@ def escalate(ctx: dict[str, Any], reason: str, message: str, questions: list[str
 def finish(ctx: dict[str, Any], summary: str) -> dict:
     t0 = time.perf_counter()
     why = ctx.pop("_tool_why", "")
+    gaps = [a for a, v in ctx.get("coverage", {}).items() if v["status"] == "unresearched"]
+    if gaps and not ctx.get("finish_nudged"):
+        ctx["finish_nudged"] = True
+        return {"ok": False, "unresearched": gaps, "instruction": "Investigate minimum coverage and call review_coverage; preferences are not the research boundary. If sources/budget genuinely prevent completion, call finish again for an explicitly partial report."}
+    if gaps:
+        ctx.setdefault("limitations", []).append("Not researched: " + ", ".join(COVERAGE_AREAS[a] for a in gaps))
     ctx["finished"] = True
     ctx["finish_summary"] = summary
     ms = int((time.perf_counter() - t0) * 1000)

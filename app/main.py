@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from pathlib import Path
 
@@ -23,6 +24,12 @@ APP_DIR = Path(__file__).resolve().parent
 async def lifespan(_app: FastAPI):
     db.init()
     _check_settings()
+    try:   # jobs from a previous run lost their worker threads; saved results past retention are dropped (D43)
+        from app import jobs
+        db.jobs_orphan_cleanup()
+        jobs.purge_expired()
+    except Exception:
+        logging.getLogger("app").exception("job cleanup failed")
     yield
 
 
@@ -41,10 +48,10 @@ def _check_settings() -> None:
         missing.append("GOOGLE_PLACES_API_KEY")
     if missing:
         logging.getLogger("app").error("Missing settings in .env: %s — those features will fail.", ", ".join(missing))
-        print(f"\n*** Church Search: missing in .env: {', '.join(missing)} ***\n")
+        print(f"\n*** ChurchFocus: missing in .env: {', '.join(missing)} ***\n")
 
 
-app = FastAPI(title="Church Search", lifespan=lifespan)
+app = FastAPI(title="ChurchFocus", lifespan=lifespan)
 templates = Jinja2Templates(directory=str(APP_DIR / "templates"))
 static_dir = APP_DIR / "static"
 if static_dir.is_dir():
@@ -55,12 +62,170 @@ _session_results: dict[str, list[tuple[Church, object]]] = {}
 _interviewers: dict[str, object] = {}
 
 
+# ---------------------------------------------------------------- v2 routes (REDESIGN.md §9)
+def _v2_call(fn, *a, **k):
+    try:
+        return fn(*a, **k)
+    except (KeyError,ValueError) as e:
+        return JSONResponse({"error":str(e)},status_code=422)
+    except NotImplementedError as e:
+        return JSONResponse({"error": "not_implemented", "task": str(e)}, status_code=501)
+
+
+@app.get("/", response_class=HTMLResponse)
+def app_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request, "app.html", {"title": "ChurchFocus"})
+
+
+@app.post("/api/chat")
+async def api_chat_v2(request: Request):
+    body = await request.json()
+    from app.stage0 import conversation
+
+    sid = body.get("session_id") or uuid.uuid4().hex
+    out = await run_in_threadpool(lambda: _v2_call(conversation.turn, sid, body.get("text")))
+    if isinstance(out, JSONResponse):
+        return out
+    return JSONResponse({"session_id": sid, **out})
+
+
+@app.get("/api/state/{sid}")
+def api_state(sid: str, since: int = 0):
+    from app import chat
+
+    out = {"messages": chat.since(sid, since), "jobs": [], "table_version": 0, "memory_version": 0}
+    try:
+        from app import jobs
+        out["jobs"] = jobs.status(sid)
+    except NotImplementedError:
+        pass
+    try:
+        from app import memory
+        out["memory_version"] = memory.version(sid)
+        out["table_version"] = memory.table_version(sid)
+    except (NotImplementedError, AttributeError, ImportError):
+        pass
+    out["location"] = memory.location(sid)
+    out["research"] = db.session_state(sid)
+    return JSONResponse(out)
+
+
+@app.get("/api/churches/{sid}")
+def api_churches(sid: str, radius: float | None = None, sort: str = "fit", page: int = 1, size: int = 10):
+    from app.stage1 import search
+
+    from app import memory
+    radius = radius if radius is not None else memory.to_profile(sid).max_miles or 15
+    out = _v2_call(search.table, sid, radius_mi=min(max(radius, 1), 50), sort=sort, page=page, size=min(max(size, 5), 50))
+    return out if isinstance(out, JSONResponse) else JSONResponse(out)
+
+
+@app.post("/api/know_more")
+async def api_know_more(request: Request):
+    body = await request.json()
+    from app.stage0 import conversation
+
+    from app import jobs
+    if body.get("action")=="prepare":
+        out = await run_in_threadpool(lambda:_v2_call(jobs.prepare,body["session_id"]))
+    else:
+        out = await run_in_threadpool(lambda: _v2_call(conversation.know_more, body["session_id"], list(body.get("church_ids") or [])))
+    return out if isinstance(out, JSONResponse) else JSONResponse(out)
+
+
+@app.post("/api/pin")
+async def api_pin(request: Request):
+    body=await request.json()
+    from app import jobs
+    if not isinstance(body.get("pinned"),bool):
+        return JSONResponse({"error":"pinned must be true or false"},status_code=422)
+    out=await run_in_threadpool(lambda:_v2_call(jobs.pin,body["session_id"],body["church_id"],body["pinned"]))
+    return out if isinstance(out,JSONResponse) else JSONResponse(out)
+
+
+@app.post("/api/restart")
+async def api_restart(request: Request):
+    body=await request.json()
+    from app.stage0 import conversation
+    out=await run_in_threadpool(lambda:_v2_call(conversation.restart,body["session_id"],body.get("mode","new")))
+    return out if isinstance(out,JSONResponse) else JSONResponse(out)
+
+
+@app.post("/api/radius")
+async def api_radius(request: Request):
+    body=await request.json()
+    from app import memory
+    from app.models import MemoryOp
+    from app.stage1 import search
+    try:
+        radius=min(max(float(body["radius"]),1),50)
+    except (ValueError,TypeError,KeyError):
+        return JSONResponse({"error":"Choose a distance between 1 and 50 miles"},status_code=422)
+    sid=body["session_id"]
+    loc=memory.location(sid)
+    if loc:
+        memory.append(sid,[MemoryOp(t=memory.next_turn(sid),op="revise",key="location",val={**loc,"limit_miles":radius},
+                                    stance="want",strength=1,conf=1,src="user_edit",why="edited distance filter")])
+        search.request_coverage(sid,loc["lat"],loc["lng"],radius)
+    return JSONResponse({"location":memory.location(sid)})
+
+
+@app.get("/api/memory/{sid}")
+def api_memory(sid: str):
+    from app import memory
+
+    return JSONResponse(_v2_call(memory.plain_summary, sid))
+
+
+@app.post("/api/memory/{sid}")
+async def api_memory_edit(sid: str, request: Request):
+    body = await request.json()
+    from app import memory
+
+    out = await run_in_threadpool(lambda: _v2_call(memory.user_edit, sid, body.get("key", ""), body.get("text", "")))
+    if isinstance(out, JSONResponse):
+        return out
+    if out:
+        return JSONResponse({"error": "Could not apply this edit", "details": out}, status_code=422)
+    return JSONResponse(memory.plain_summary(sid))
+
+
+@app.get("/api/questions/{sid}")
+def api_questions(sid: str, church_id: str | None = None):
+    from app import qa
+
+    return JSONResponse(qa.open_questions(sid, church_id))
+
+
+@app.post("/api/questions/{sid}")
+async def api_questions_edit(sid: str, request: Request):
+    body = await request.json()
+    from app import qa
+
+    if body.get("id"):
+        if not any(q["id"] == int(body["id"]) for q in qa.open_questions(sid)):
+            return JSONResponse({"error": "Question not found"}, status_code=404)
+        qa.update_question(int(body["id"]), text=body.get("text"), status=body.get("status"))
+    elif body.get("church_id") and body.get("text"):
+        qa.add_question(sid, body["church_id"], body["text"])
+    return JSONResponse(qa.open_questions(sid))
+
+
+@app.post("/api/deep")
+async def api_deep_v2(request: Request):
+    body = await request.json()
+    from app import jobs
+
+    out = await run_in_threadpool(lambda: _v2_call(jobs.submit, body["session_id"], body["church_id"], "deep",questions=list(body.get("questions") or [])))
+    return out if isinstance(out, JSONResponse) else JSONResponse({"job_id": out})
+
+
 @app.get("/healthz")
 def healthz() -> dict:
     return {"status": "ok"}
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/v1", response_class=HTMLResponse)
 def index(request: Request) -> HTMLResponse:
     from app.stage0.interviewer import Interviewer
 
@@ -72,7 +237,7 @@ def index(request: Request) -> HTMLResponse:
         request,
         "chat.html",
         {
-            "title": "Church Search",
+            "title": "ChurchFocus",
             "session_id": session_id,
             "initial_say": turn.get("say", ""),
             "initial_options": turn.get("options"),
@@ -93,7 +258,7 @@ def _get_interviewer(session_id: str):
     return iv
 
 
-@app.post("/api/chat")
+@app.post("/v1/api/chat")
 async def api_chat(request: Request):
     ctype = request.headers.get("content-type", "")
     if "application/json" in ctype:
@@ -128,7 +293,7 @@ async def api_chat(request: Request):
     return JSONResponse(payload)
 
 
-@app.post("/api/profile/confirm")
+@app.post("/v1/api/profile/confirm")
 async def api_profile_confirm(request: Request):
     ctype = request.headers.get("content-type", "")
     if "application/json" in ctype:
@@ -149,7 +314,7 @@ async def api_profile_confirm(request: Request):
     return JSONResponse(profile.model_dump(mode="json") | {"done": turn.get("done", True)})
 
 
-@app.post("/api/search")
+@app.post("/v1/api/search")
 async def api_search(request: Request):
     body = await request.json()
     session_id = body["session_id"]
@@ -175,7 +340,7 @@ async def api_search(request: Request):
     return JSONResponse(out)
 
 
-@app.get("/results/{session_id}", response_class=HTMLResponse)
+@app.get("/v1/results/{session_id}", response_class=HTMLResponse)
 def results_page(request: Request, session_id: str) -> HTMLResponse:
     profile = db.get_profile(session_id)
     results = _session_results.get(session_id)
@@ -189,7 +354,7 @@ def results_page(request: Request, session_id: str) -> HTMLResponse:
         request,
         "results.html",
         {
-            "title": "Results — Church Search",
+            "title": "Results — ChurchFocus",
             "session_id": session_id,
             "profile": profile,
             "origin_text": (profile.origin or {}).get("text", "") if profile else "",
@@ -198,7 +363,7 @@ def results_page(request: Request, session_id: str) -> HTMLResponse:
     )
 
 
-@app.post("/api/medium")
+@app.post("/v1/api/medium")
 async def api_medium(request: Request):
     ctype = request.headers.get("content-type", "")
     if "application/json" in ctype:
@@ -272,7 +437,7 @@ def _serialize_card(card: dict) -> dict:
     return out
 
 
-@app.post("/api/deep")
+@app.post("/v1/api/deep")
 async def api_deep(request: Request):
     body = await request.json()
     session_id = body["session_id"]

@@ -213,6 +213,10 @@ def chat_tools(
 
         client = OpenAI(api_key=get_settings().openai_api_key)
         extra: dict[str, Any] = {"tool_choice": tool_choice} if tool_choice else {}
+        # U15/D26: gpt-5.x on /v1/chat/completions rejects function tools unless reasoning_effort is "none".
+        effort = get_settings().tools_reasoning_effort
+        if effort:
+            extra["reasoning_effort"] = effort
         for attempt in range(2):  # one retry on rate limit / server error
             try:
                 resp = client.chat.completions.create(model=model, messages=messages, tools=tools, **extra)

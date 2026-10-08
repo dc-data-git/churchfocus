@@ -16,6 +16,15 @@ from tests.fakes import FakeLLM, FakeWeb
 
 FIX = Path(__file__).parent / "fixtures"
 
+
+@pytest.fixture(autouse=True)
+def offline_report_model(monkeypatch):
+    """Report rendering regressions never call a live model."""
+    monkeypatch.setattr(report_module, "complete_json", lambda *a, **k: {
+        "at_a_glance": "Offline research report", "how_it_fits": "",
+        "stated_vs_observed": "", "still_unknown": "", "questions_for_visit": []})
+
+
 MARRIAGE_QUOTE = (
     "We believe marriage is a covenant between one man and one woman, "
     "ordained by God for the union of husband and wife."
@@ -163,7 +172,7 @@ class TestDeepSearch:
 
         return next_turn
 
-    def test_stops_when_important_settled(self, data_dir, monkeypatch):
+    def test_continues_after_preferences_settled(self, data_dir, monkeypatch):
         FakeWeb(pages=_beliefs_page(), robots={"grace-baptist.fixture": "User-agent: *\nAllow: /\n"}).install(
             monkeypatch
         )
@@ -227,13 +236,13 @@ class TestDeepSearch:
                 ]
             },
         ]
-        fake = FakeLLM({"deep_search:tools": self._script_tools(steps)})
+        fake = FakeLLM({"deep_search:tools": self._script_tools(steps + [steps[-1]])})
         monkeypatch.setattr("app.stage3.agent.chat_tools", fake.chat_tools)
         monkeypatch.setattr("app.stage3.report.complete_json", lambda *a, **k: {"at_a_glance": "Done.", "how_it_fits": "", "stated_vs_observed": "", "still_unknown": "", "questions_for_visit": []})
 
         rep = agent.deep_search(church, profile, "job-settled")
         assert "lgbtq.marriage" in rep.settled
-        assert fake.calls  # at most 2 chat turns because loop stops when settled
+        assert len(fake.calls) >= 4  # preference coverage alone no longer ends research
         whys = _log_whys(data_dir)
         assert all(w for w in whys)
 

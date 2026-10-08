@@ -9,7 +9,7 @@ from typing import Any, Callable
 
 from app import db
 from app.config import get_settings
-from app.features import settled_open
+from app.features import settled_open, all_features
 from app.llm import chat_tools, load_prompt
 from app.models import Church, PreferenceProfile
 from app.stage3 import report as report_module
@@ -40,13 +40,14 @@ _EVIDENCE_ITEM = {
 
 _TOOL_SCHEMAS: list[dict[str, Any]] = [
     _fn("fetch_page", "Fetch a public page (text trimmed to ~4,000 chars + up to 30 links).", {"url": {"type": "string"}}, ["url"]),
+    _fn("read_source", "Read the next chunk of a saved/fetched source, or locate text; inspect all staff chunks before declaring full staff coverage.", {"url": {"type": "string"}, "query": {"type": "string"}, "offset": {"type": "integer"}}, ["url"]),
     _fn("search_web", "Search the public web; returns titles, URLs and snippets.", {"query": {"type": "string"}}, ["query"]),
     _fn("wayback_snapshots", "List archived snapshots of a URL (leadership tenure, changed statements).",
         {"url": {"type": "string"}, "years": {"type": "array", "items": {"type": "integer"}}}, ["url", "years"]),
     _fn("denomination_lookup", "What a denomination typically holds (a prior, never a fact about this church).",
         {"name_or_id": {"type": "string"}}, ["name_or_id"]),
     _fn("find_sermon_feeds", "Find sermon podcast/RSS/media feeds on THIS church's website.", {}, []),
-    _fn("get_sermons", "List sermons from a feed, newest first. Returns sermon_ids.",
+    _fn("get_sermons", "List sermons from RSS, YouTube video/channel/playlist URLs, including completed livestreams. Returns sermon_ids.",
         {"feed_url": {"type": "string"}, "limit": {"type": "integer"}}, ["feed_url"]),
     _fn("transcribe_sermons", "Transcribe sermons by sermon_id (3 in parallel; total capped per church).",
         {"sermon_ids": {"type": "array", "items": {"type": "string"}}}, ["sermon_ids"]),
@@ -59,12 +60,14 @@ _TOOL_SCHEMAS: list[dict[str, Any]] = [
         {"reason": {"type": "string", "enum": ["dealbreaker_conflict", "low_denom_confidence", "budget_exhausted"]},
          "message": {"type": "string"}, "questions": {"type": "array", "items": {"type": "string"}}},
         ["reason", "message", "questions"]),
-    _fn("finish", "Stop: all must-have/important features settled or not findable. Summarise in <= 5 sentences.",
+    _fn("review_coverage", "Record broad coverage after investigating an area; source URLs must have been fetched.", {"area": {"type": "string", "enum": list(tools.COVERAGE_AREAS)}, "status": {"type": "string", "enum": ["supported", "partial", "not_found"]}, "summary": {"type": "string"}, "urls": {"type": "array", "items": {"type": "string"}}}, ["area", "status", "summary"]),
+    _fn("finish", "Stop after broad minimum coverage or report explicit limitations. Summarise in <= 5 sentences.",
         {"summary": {"type": "string"}}, ["summary"]),
 ]
 
 _TOOL_DISPATCH: dict[str, Callable[..., dict]] = {
     "fetch_page": tools.fetch_page,
+    "read_source": tools.read_source,
     "search_web": tools.search_web,
     "wayback_snapshots": tools.wayback_snapshots,
     "denomination_lookup": tools.denomination_lookup,
@@ -77,6 +80,7 @@ _TOOL_DISPATCH: dict[str, Callable[..., dict]] = {
     "record_evidence": tools.record_evidence,
     "escalate": tools.escalate,
     "finish": tools.finish,
+    "review_coverage": tools.review_coverage,
 }
 
 
@@ -85,7 +89,7 @@ def _priority_features(profile: PreferenceProfile) -> list[str]:
 
 
 def _target_features(profile: PreferenceProfile) -> list[str]:
-    return [p.feature for p in profile.preferences if p.weight != "dont_care"]
+    return list(all_features())
 
 
 def _important_settled(profile: PreferenceProfile, evidence) -> bool:
@@ -130,9 +134,13 @@ def _state_message(church: Church, profile: PreferenceProfile, ctx: dict[str, An
                                          "weight": next((p.weight for p in profile.preferences if p.feature == f), "")}
                                      for f in open_f},
             "profile_session": profile.session_id,
+            "memory": __import__("app.memory", fromlist=["context"]).context(profile.session_id),
             "settled": settled,
             "open": open_f,
             "priority_open": priority_open,
+            "user_questions": ctx.get("open_questions", []),
+            "coverage": ctx.get("coverage", {}),
+            "saved_sources": [{k: v for k, v in source.items() if k != "text"} for source in ctx.get("saved_sources", [])],
             "budget": _budget_remaining(ctx),
             "escalations": [e.model_dump(mode="json") for e in ctx.get("escalations", [])],
         },
@@ -196,8 +204,85 @@ def deep_search(church: Church, profile: PreferenceProfile, job_id: str):
         profile=profile,
         church=church,
     )
+    from app import qa
+    ctx["saved_sources"] = db.research_sources(church.church_id)
+    for source in ctx["saved_sources"]:
+        tools._track_fetched(ctx, source["url"], source.get("text", ""))
+        if source.get("kind") == "sermon":
+            sid = "saved" + str(len(ctx["transcripts"]) + 1)
+            ctx["transcripts"][sid] = {**source, "page_url": source["url"]}
+    ctx["open_questions"] = [q["text"] for q in qa.open_questions(profile.session_id, church.church_id) if q["status"] == "open"]
+    stale_unverified = []
+    for source in ctx["saved_sources"]:
+        if source.get("kind") == "sermon":
+            continue  # Published transcripts are immutable; feed discovery adds new sermons.
+        try:
+            source_age = (datetime.now(timezone.utc) - datetime.fromisoformat(source["checked_at"]).replace(tzinfo=timezone.utc)).total_seconds() / 86400
+        except (ValueError, TypeError, KeyError):
+            source_age = 999
+        if source_age >= 30:
+            if tools.cancelled(ctx):
+                return None
+            if _budget_exhausted(ctx):
+                stale_unverified.append(source["url"])
+                continue
+            ctx["_tool_why"] = "Verify previously saved public information older than one month"
+            ctx["tool_calls"] += 1
+            db.update_job(job_id, label="Verifying saved website information")
+            verified_page = tools.fetch_page(ctx, source["url"])
+            if not verified_page.get("text"):
+                stale_unverified.append(source["url"])
+    if stale_unverified:
+        ctx["limitations"].append("Previously saved sources could not be verified: " + ", ".join(stale_unverified))
+    previous = db.latest_job(church.church_id, "deep")
+    if previous and previous.get("result_json") and ctx["saved_sources"]:
+        verified = previous.get("verified_at") or previous.get("finished_at")
+        try:
+            age = (datetime.now(timezone.utc) - datetime.fromisoformat(verified).replace(tzinfo=timezone.utc)).total_seconds() / 86400
+            saved_result = json.loads(previous["result_json"])
+        except (ValueError, TypeError):
+            age, saved_result = 999, {}
+        coverage = saved_result.get("coverage", {})
+        if age < 30 and not stale_unverified and set(coverage) == set(tools.COVERAGE_AREAS):
+            ctx["coverage"] = coverage
+            ctx["resources"] = saved_result.get("resources", [])
+            ctx["limitations"] = saved_result.get("limitations", [])
+            ctx["sermons_analysed"] = saved_result.get("sermons_analysed", 0)
+            ctx["reuse_verified_at"] = verified
+            ready = all(v.get("status") in {"supported", "not_found"} for v in coverage.values()) and not ctx["limitations"]
+            if ready:
+                # Current user's questions must be answered, never copied from another report.
+                answers = [qa.answer(profile.session_id, church.church_id, q, record=False) for q in ctx["open_questions"]]
+                if all(a.get("confident") for a in answers):
+                    ctx["finished"] = True
+                    ctx["finish_summary"] = "Reused recently verified public research; report rebuilt for this conversation."
     status = "complete"
     try:
+        if not ctx.get("sermons_analysed") and not tools.cancelled(ctx):
+            db.update_job(job_id, label="Discovering sermon recordings")
+            ctx["_tool_why"] = "Core deep-dive requirement: discover substantive sermon content"
+            feeds = tools.find_sermon_feeds(ctx).get("feeds", [])
+            for feed in sorted(feeds, key=lambda f: f.get("kind") != "youtube"):
+                if tools.cancelled(ctx) or _budget_exhausted(ctx):
+                    break
+                if feed.get("kind") != "youtube":
+                    continue
+                ctx["_tool_why"] = "Find recent public service recordings for sermon analysis"
+                ctx["tool_calls"] += 1
+                listing = tools.get_sermons(ctx, feed["url"], limit=5).get("sermons", [])
+                ids = [x["sermon_id"] for x in listing]
+                if not ids:
+                    continue
+                db.update_job(job_id, label="Collecting sermon transcripts")
+                ctx["_tool_why"] = "Collect published captions or audio transcripts for substantive analysis"
+                ctx["tool_calls"] += 1
+                tools.transcribe_sermons(ctx, ids)
+                if ctx.get("transcripts"):
+                    db.update_job(job_id, label="Analysing sermon teaching")
+                    ctx["_tool_why"] = "Analyse actual teaching, rather than titles or stated values"
+                    ctx["tool_calls"] += 1
+                    tools.analyse_sermons(ctx)
+                    break
         _loop(church, profile, job_id, ctx)
     except Exception as e:  # R6: model/API failure -> partial report, job marked error
         import logging
@@ -207,16 +292,22 @@ def deep_search(church: Church, profile: PreferenceProfile, job_id: str):
         tools.escalate(ctx, reason="budget_exhausted", message=f"Research stopped early because of an error ({type(e).__name__}). "
                        "What we found so far is below.", questions=[])
 
+    if tools.cancelled(ctx):
+        return None
+    if not ctx.get("sermons_analysed"):
+        ctx["limitations"].append("Sermon analysis incomplete: no substantive sermon transcripts were analysed.")
     all_evidence = db.get_evidence(church.church_id)
     updated_church = ctx.get("church") or church
     updated_church = updated_church.model_copy(update={"evidence": all_evidence, "stage_done": max(church.stage_done, 3)})
     try:
         rep, narrative = report_module.build_report(updated_church, profile, ctx)
+        if tools.cancelled(ctx):
+            return None
         path = report_module.save_report(rep, job_id, narrative=narrative)
     except Exception as e:
         db.update_job(job_id, status="error", progress=100, finished_at=datetime.now(timezone.utc).isoformat())
         raise RuntimeError(f"report failed: {e}") from e
-    db.update_job(job_id, status=status, progress=100, report_path=str(path),
+    db.update_job(job_id, status=status, progress=100, report_path=str(path), verified_at=ctx.get("reuse_verified_at") if not ctx.get("sources_refreshed") else datetime.now(timezone.utc).isoformat(), result_json=json.dumps({"coverage": ctx["coverage"], "resources": ctx["resources"], "limitations": ctx["limitations"], "sermons_analysed": ctx["sermons_analysed"]}), label="Report ready" if not ctx["limitations"] and status == "complete" else "Stopped early — partial report ready",
                   finished_at=datetime.now(timezone.utc).isoformat())
     return rep
 
@@ -226,15 +317,18 @@ def _loop(church: Church, profile: PreferenceProfile, job_id: str, ctx: dict[str
         db.add_evidence(church.church_id, church.evidence)
 
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": load_prompt("deep_search.v2")},
-        {"role": "user", "content": _state_message(church, profile, ctx)},
+        {"role": "system", "content": load_prompt("deep_search.v5")},
+        {"role": "user", "content": _state_message(church, profile, ctx) + "\nUser questions to research: " + json.dumps(ctx.get("open_questions", []))},
     ]
     nudged = False
     while True:
+        if tools.cancelled(ctx):
+            return
         evidence = db.get_evidence(church.church_id)
-        if ctx.get("finished") or _important_settled(profile, evidence):
+        if ctx.get("finished"):
             break
         if _budget_exhausted(ctx):
+            ctx["limitations"].append("Research budget reached; remaining coverage and questions may be incomplete.")
             open_db = _open_dealbreakers(profile, evidence)
             if open_db:
                 from app.features import feature as _feature
@@ -247,10 +341,12 @@ def _loop(church: Church, profile: PreferenceProfile, job_id: str, ctx: dict[str
                 )
             break
 
+        db.update_job(job_id, label="Choosing the next research source", done=len(ctx.get("transcripts", {})), total=0)
         response = chat_tools("deep_search", _compact(messages), _TOOL_SCHEMAS, tier="strong", tool_choice="required")
         tool_calls = response.get("tool_calls") or []
         if not tool_calls:
             if nudged:
+                ctx["limitations"].append("Research stopped because the agent did not continue using research tools.")
                 break
             nudged = True   # one plain-text reply: nudge once, then stop
             messages.append({"role": "assistant", "content": response.get("content") or ""})
@@ -269,9 +365,12 @@ def _loop(church: Church, profile: PreferenceProfile, job_id: str, ctx: dict[str
             ctx["tool_calls"] = int(ctx.get("tool_calls", 0)) + 1
             if args is None:
                 result = {"error": "arguments were not valid JSON; try again with smaller arguments"}
+            elif tools.cancelled(ctx):
+                result = {"cancelled": True}
             elif ctx.get("finished"):
                 result = {"skipped": "finish was already called"}
             else:
+                db.update_job(job_id, label={"fetch_page": "Reading public website pages", "transcribe_sermons": "Collecting sermon transcripts", "analyse_sermons": "Analysing sermon teaching", "search_web": "Checking public sources"}.get(name, "Researching " + name.replace("_", " ")), done=len(ctx.get("transcripts", {})), total=0)
                 result = _execute_tool(ctx, name, args)
             messages.append({"role": "tool", "tool_call_id": tc.get("id", name), "content": json.dumps(result, default=str)})
 

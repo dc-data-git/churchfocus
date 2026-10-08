@@ -1,4 +1,4 @@
-# Church Search — Agent Build Doc (Track 1)
+# ChurchFocus — Agent Build Doc (Track 1)
 
 _Owner: Carter. Fill remaining blanks from live logs before finalist submission._
 
@@ -47,3 +47,9 @@ Denomination KB rebuild: `denom-kb/README.md`. MCP: `python -m app.denom.mcp_ser
 
 ## Bonuses claimed
 MCP server (denomination KB); published eval set (`eval/` when H3/T8.1 land); cost metrics (`calls.jsonl`); reusable components (denom-kb, christianese-lexicon, features.yaml).
+
+## Evening rebuild implementation
+The default UI is a single conversation with Churches, About you and Open questions panels. Conversation uses `interview_skill.v1`; validated memory operations form an append-only SQLite log. Mapped christianese hints assist extraction. Location starts background search; church ranking updates from current memory. Website research runs in five workers with progress and cancellation; deep research has two workers. Factual Q&A requires a verbatim quote at the returned source URL. Open questions become deep-research targets and appear in the final report. Earlier v1 pages remain at `/v1`. Live evaluation figures and burden validation above still require team evidence; offline tests do not establish live API quality.
+
+### Verified rebuild state
+Final suite: 167 passed; desktop/mobile browser flow and real conversation/Places/website/capped deep-report checks passed. Interview prompt is now `interview_skill.v3` with a complete MemoryOp response schema. Verification methodology and explicit MVP limits are recorded in `docs/REBUILD_VERIFICATION.md`. These capped checks do not replace long-form sermon evaluation or human burden validation.

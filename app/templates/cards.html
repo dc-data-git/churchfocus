@@ -95,7 +95,7 @@
     const btn = document.getElementById('deep-btn');
     btn.disabled = true;
     box.textContent = 'Starting deep research…';
-    fetch('/api/deep', {
+    fetch('/v1/api/deep', {
       method: 'POST',
       headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
       body: JSON.stringify({session_id: sessionId, church_ids: ids})
