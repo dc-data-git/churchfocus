@@ -1,90 +1,96 @@
 # ChurchFocus — PRD
 
-Status: v1 spec for the 2026 Gloo AI Hackathon (Track 1, Agents of Flourishing). Living document.
-Owner: Daniel (integration, Stage 1). Theology: Katie. Shared research doc + Stage 3 sources: Carter. Stage 3 sources: Wade.
-Deadlines: **preliminary submission 9:00 pm MT / 10:00 pm CT Wed Oct 7** (code + 250-word description); finalist submission 9:00 am MT Thu Oct 8; 90-second presentation.
+Status: **built and in user testing** (2026 Gloo AI Hackathon, Track 1, Agents of Flourishing). This document reflects the app after the October 7 evening rebuild and repair (tasks W0–W7, X0–X5, C1–C8). Living document. The decision log (§7) is append-only.
+Team: Daniel (integration, Stage 1, lead), Katie (theology), Carter (shared research doc, Stage 3 sources), Wade (Stage 3 sources).
+Deadlines: preliminary submission 9:00 pm MT / 10:00 pm CT Wed Oct 7 (code + 250-word description); finalist submission 9:00 am MT Thu Oct 8; 90-second presentation.
 
 Normative words: **must**, **must not**, **should**, **may**.
 
 ## 1. Problem and user
 
-Choosing a church is a high-stakes, low-information decision. Websites and statements of faith say what a church *says* it believes; they rarely show what it *does* (who preaches, what sermons emphasise, how worship feels). Seekers either visit for months or rely on word of mouth. People who help others find a church — campus pastors placing students, nonprofit workers helping refugees or people in recovery reconnect — repeat this research by hand for every person.
+Choosing a church is a high-stakes, low-information decision. Websites and statements of faith say what a church *says* it believes. They rarely show what it *does*: who preaches, what sermons emphasize, how worship feels. Seekers either visit for months or rely on word of mouth. People who help others find a church repeat this research by hand for every person. Examples are campus pastors placing students and nonprofit workers helping refugees or people in recovery reconnect.
 
-**User (D1):** anyone looking for a church for themselves *or for someone else*. The Track 1 framing is the helper: a campus pastor or nonprofit worker who must recommend churches to many people and cannot research each one deeply.
+**User (D1):** anyone looking for a church for themselves *or for someone else*. The Track 1 framing is the helper: a campus pastor or nonprofit worker who recommends churches to many people and can't research each one deeply.
 
-**Burden validation:** _[HUMAN: name + one-line quote from a campus pastor / nonprofit worker who confirmed this burden. Required for the Agent Build Doc.]_
+**Burden validation:** _[HUMAN: name + one-line quote from a campus pastor / nonprofit worker who confirmed this burden. Required for the Agent Build Doc. Task H5.]_
 
 ## 2. Product summary
 
-An interactive church finder that **does not maintain a database of churches**. It researches churches on demand, keeps what it learned (with sources and dates) and re-checks it before reuse. Background knowledge is a denomination knowledge base (217 US groups, six layers) behind a tool interface (MCP).
+ChurchFocus is a conversational church finder that **does not maintain a database of churches**. It researches churches on demand, keeps what it learned with sources and dates, and re-checks saved research before reuse. Background knowledge is a denomination knowledge base (217 US groups, six layers) behind an MCP tool interface.
 
-| Stage | Name | What happens | Output | Time budget |
-|---|---|---|---|---|
-| 0 | Conversation | Scenario questions build a weighted preference profile; read-back checkpoint | `PreferenceProfile` + likely traditions/denominations | 3–6 min |
-| 1 | Light search | Places API → church list; denomination inferred with confidence | ranked list of churches with denomination + why | < 60 s |
-| 2 | Medium search | User picks 1–5 churches; website research | summary card per church + "deep-dive candidate" rating | < 2 min/church |
-| 3 | Deep search | User picks 1–3; agent researches sermons, history, publications | **Church Report** (finished artifact) with tiered evidence, stated-vs-observed, questions to ask on a visit | 15 min – 2 h, background |
+| Stage | What happens | Started by | Output |
+|---|---|---|---|
+| 0 Conversation | The person describes, in their own words, where they're starting and what matters. The model proposes memory entries; the server validates them. | always on | Append-only memory log → current `PreferenceProfile`; About-you tab |
+| 1 Discovery | Places search around the starting place (OSM fallback); cheap denomination match; non-Nicene groups removed | a starting place (silent, background) | Churches tab: fit label, distance, denomination, why lines; re-ranks as memory changes |
+| 2 Website research | Bounded recursive scan of the public site; factual extraction with verbatim quotes | **Learn more → Research selected (1–5)**, or a pin | Factual summary per church: services, full public staff, active ministries, beliefs, coverage gaps |
+| Q&A | Factual questions answered only from saved sources | a chat question | Sourced answer, or an Open question |
+| 3 Deep research | Tool-using agent, seven coverage areas, sermons central, the person's open questions | a Deep dive button or chat request | **Church Report** (shareable HTML, prints to PDF) |
 
-## 3. Requirements
+## 3. Requirements (current)
 
-### 3.1 Stage 0 — conversation
-- R0.1 The interviewer **must** draw questions only from `contracts/features.yaml` (`ask: core` always; `standard` by default, skippable; `if_raised` only when the user brings it up; `advanced` only if the user opts into theology detail).
-- R0.2 Questions **must** be phrased as observable scenarios (the `question` text), not jargon. User jargon is mapped to features (lexicon when available, else model mapping with the feature list).
-- R0.3 Each answer becomes `{feature: {want: [values], weight}}` with weight ∈ dealbreaker / important / nice_to_have / dont_care. "Prefer not to say" = dont_care.
-- R0.4 The women-in-ministry ladder is **one** question mapping to the six `women.*` features. The LGBTQ question is asked by default (D14) with neutral options incl. "doesn't matter" and "prefer not to say".
-- R0.5 The interviewer **must** read the profile back in plain language and let the user correct it before Stage 1 (checkpoint).
-- R0.6 The user may be searching for someone else ("for others" mode): the interviewer asks about that person and never asks the helper for that person's sensitive details beyond what matching needs.
-- R0.7 Pastoral or crisis content (grief, abuse, self-harm) **must** stop the interview flow and escalate to a human (see §5).
+### 3.1 Conversation (Stage 0)
+- R0.1 The conversation **must** be open-ended (D24). It asks for a starting place, then invites the person once to say what matters and what to avoid, and asks follow-ups only when an answer would change results. It **must not** ask the person to pick want/avoid/doesn't-matter or rate importance (D27).
+- R0.2 Everything the person says **should** update memory, not just the answer to the last question. Church jargon is read with lexicon hints (D34). Hints are guesses and never become hard filters.
+- R0.3 Memory **must** be an append-only log of operations with evidence and reasons (D27). The current profile is computed from the log with fixed rules, and the person can see and correct it (D32). Corrections are logged, never overwritten.
+- R0.4 The bot **must not** raise belief topics the person hasn't mentioned, such as women in leadership, marriage/LGBTQ or baptism (D33, supersedes D14). If the person raises one, it follows their lead neutrally.
+- R0.5 In "for others" mode the bot **must not** ask about the private life of the person being helped.
+- R0.6 Crisis content **must** stop the normal reply and show the 988 / trusted-person message (§3.6). Grief and past church hurt are not crises (R11).
+- R0.7 Side questions **should** be answered: denomination summaries and comparisons from the KB, labeled as typical for the denomination (D35), and factual questions about churches (R2.4).
+- R0.8 The bot **must not** claim an action happened that the server didn't perform. A deep dive is acknowledged only after the job exists, and an ambiguous church name gets a clarifying question. "Start over" offers a new chat or a changed search before resetting.
 
-### 3.2 Stage 1 — light search
-- R1.1 Places API (New) Text Search, `includedType: church`, `locationBias` circle, paging up to 60 results; OSM/Overture fallback if Places fails.
-- R1.2 Denomination resolution (D5): name/alias match against the denomination KB → denomination/network locator cross-search → website classification. Result carries `confidence` 0–1 and `method`.
-- R1.3 Non-denominational workaround: affiliated churches removed from the "nondenom" bucket; churches that say non-denominational/unaffiliated and unknowns grouped; "secret denomination" detection yields a confidence, not a verdict.
-- R1.4 Ranking is deterministic (§ARCHITECTURE Matcher) from profile × denomination priors × distance; each row shows *why*.
-- R1.5 Google attribution displayed; only `place_id` cached indefinitely.
+### 3.2 Discovery (Stage 1)
+- R1.1 Places API (New) Text Search with a `locationBias` circle and paging up to 60 results, with an OSM Overpass fallback. Discovery starts in the background once a place is known (D39) and **must not** post chat announcements (U41).
+- R1.2 Coverage expands on demand up to 50 miles (D38). It uses one query circle up to 12 mi, or a centre plus a ring of six, and queries again only when the radius grows beyond what is covered (D40, C8). Results appear as each circle finishes.
+- R1.3 Denomination: a cheap name/KB match for every church, and website classification only for rows shown with low confidence. The result carries `confidence` and `method`, and unverified affiliation is labeled.
+- R1.4 Groups outside historic Trinitarian Christianity **must** be removed everywhere (D29).
+- R1.5 Ranking is deterministic and explainable (D20, ARCHITECTURE §7). Fit labels: Strong, Possible, Not enough info yet, Unlikely, Poor (D30/D31). Sorted by fit then distance. Radius filter defaults to 15 mi or the person's limit, and page size is adjustable.
+- R1.6 Practice and belief preferences change fit only. Hard exclusion happens only for an avoided denomination, tradition or branch, or a confirmed mismatch with an explicit required affiliation (D28, C5).
+- R1.7 Google attribution is displayed. Only `place_id` is kept long-term.
 
-### 3.3 Stage 2 — medium search
-- R2.1 For 1–5 selected churches, fetch key website pages (home, about/beliefs, staff, ministries, events, sermons) and fill `stage ≤ 2` features with tiered evidence.
-- R2.2 Output a summary card: identity, service times, leaders (public), ministries, stated beliefs relevant to the profile, matched/unmatched/unknown features, and **deep-dive candidate** rating (evidence availability × remaining uncertainty on important features).
+### 3.3 Website research (Stage 2)
+- R2.1 Website research **must not** start until the person asks (U42). **Learn more** may prepare the top five invisibly. **Research selected** (1–5) or a pin authorizes and shows them, and unselected, unpinned work is cancelled. Unpinning cancels unfinished work.
+- R2.2 Research **must** cover practical basics regardless of preferences (U44, U47): service times (day, time, online/in person), the full publicly listed staff with roles, active ministries, and stated beliefs. The scan is recursive within the site, bounded (default 30 pages / 120 s), and states what was not read.
+- R2.3 Every fact and staff entry **must** carry a verbatim quote from the page it came from. Summaries shown to the person are plain-language and factual, with no internal ids or tier jargon.
+- R2.4 Factual questions **must** be answered only from saved sources, with exact quotes at the cited URL. Otherwise the question goes to Open questions, which the person can add, edit or drop (D25). Q&A never starts a deep dive by itself.
 
-### 3.4 Stage 3 — deep search (agent)
-- R3.1 A tool-using agent loop driven by `app/prompts/deep_search.v1.md` (the guidebook). No fixed step order (D9).
-- R3.2 Stopping rule: stop when every dealbreaker/important feature is settled (`settled_rule` in features.yaml) or marked not-found, or when the time/call budget runs out.
-- R3.3 The agent **may** try sources not on the list if it logs why and stays within guardrails.
-- R3.4 Every step is written to the session log (§INTERFACES `StepLog`). The log is the auditable record for the Agent Build Doc.
-- R3.5 Sermon analysis: up to 25 sermons per church, newest first (D22; `DEEP_MAX_SERMONS`). Throughput (audio minutes per wall minute, $ per sermon) **must** be logged. The agent may stop earlier when the observed features are settled.
-- R3.6 Output: **Church Report** (HTML page + JSON), showing per feature: value, tier, quote, link, date; stated vs observed side by side where both exist; open questions to ask on a visit.
-- R3.6b The report has a shareable link and prints cleanly to PDF so a helper can pass it on.
-- R3.7 Runs in the background with progress; the user can leave and come back.
+### 3.4 Deep research (Stage 3)
+- R3.1 A tool-using agent driven by the `deep_search` guidebook (now v5), with no fixed step order (D9).
+- R3.2 Scope is broad (U47). The agent investigates seven minimum areas and chooses adaptively among nine source tactics (ARCHITECTURE §11). Preferences and the person's questions set priorities; they never limit scope. Research with no stated preferences still proceeds.
+- R3.3 Sermons are central. Up to 25 per church (D22): captions first, then transcripts, then transcription. Recovery of broken or missing channel links is allowed, but the congregation's identity must be verified before using a channel's teaching (C3/C4). Transcripts are saved for later Q&A.
+- R3.4 Every step is logged (`StepLog`) with the agent's stated reason. The log is the auditable record.
+- R3.5 Output: a **Church Report** with sources, stated vs observed, research coverage, still unknown, questions to ask on a visit, and the person's questions answered or explicitly unanswered. A report with gaps is labeled partial. It has a shareable link and prints to PDF.
+- R3.6 Runs in the background with persistent visible progress: real stage, counts and elapsed time (U45). It can be cancelled, and a failure shows explicitly.
 
-### 3.5 Cache and reuse
-- R4.1 Research results are stored per church (keyed by `place_id` + website) with `checked_at`. Before reuse, a cheap re-check (site reachable, statement-of-faith hash unchanged) **must** run; stale items are re-researched.
-- R4.2 Google Places content other than `place_id` **must not** be stored long-term.
+### 3.5 Reuse and retention
+- R4.1 Website facts younger than 7 days may be reused. A deep dive builds a fresh report per person but reuses saved sources, re-checking site pages older than 30 days. A source's date **must not** advance through a cache copy.
+- R4.2 Retention: website research 90 days, deep research 365 days (D43). Facts may be reused across sessions, but another user's preferences or reports never are.
+- R4.3 Google Places content other than `place_id` **must not** be stored long-term.
 
 ### 3.6 Escalation to humans (Track 1 requirement)
-- R5.1 Escalate (show a clear "talk to a person" card, no automated action) when: crisis/pastoral content appears; a dealbreaker feature has conflicting tier-A vs observed evidence; denomination confidence < 0.5 on a church the user wants to rely on; or the agent's budget ends with dealbreakers unsettled.
-- R5.2 The escalation card drafts **questions the user can ask the church** (email/phone/visit). The app never contacts a church itself.
-- R5.3 Who the "person" is: crisis/self-harm → 988 Suicide & Crisis Lifeline (call/text 988 in the US) and "a trusted pastor, counselor or friend"; abuse → local emergency services / a trusted person; church-fit questions → the church itself, or in "for others" mode the helper.
+- R5.1 Escalate when crisis or pastoral content appears, a dealbreaker has conflicting evidence, denomination confidence is too low for what the person relies on, or the budget ends with important questions open. Escalation is a clear message, never an automated action.
+- R5.2 Reports draft **questions the person can ask the church**. The app never contacts a church.
+- R5.3 Who the "person" is: for crisis or self-harm, 988 (call or text in the US) and "a trusted pastor, counselor or friend"; for danger, emergency services; for church-fit questions, the church itself, or in "for others" mode the helper.
 
-## 4. Non-goals (v1)
+## 4. Non-goals
 - No church accounts, reviews written by us, ratings of churches' faithfulness, or pastoral advice.
 - No collection of congregant, donor, minor or staff-pay data (D8).
-- No automated outreach (email/calls) to churches.
-- No user accounts; sessions are anonymous.
+- No automated outreach to churches.
+- No user accounts. Sessions are anonymous; the session id lives in the browser.
 
 ## 5. Guardrails (normative)
-- G1 Never collect or infer data about congregants, donors, minors, or staff pay. Named people are limited to publicly listed leaders and their published teaching.
-- G2 Never fabricate theology. Every church claim carries a source tier; D-tier (inference) is labelled "inferred". Denominational priors are labelled "typical for <denomination>".
-- G3 Social/political positions only when the church states them (tier A) or a cited outlet reports a public action (tier B). No party labels. Marriage rule per features.yaml.
-- G4 No irreversible actions; the agent only reads public web content (robots.txt respected, polite rate limits).
-- G5 No pastoral judgments ("this church is unhealthy/heretical"). Concerns = cited news reports, stated neutrally.
+- G1 Never collect or infer data about congregants, donors, minors or staff pay. Named people are limited to publicly listed leaders, their roles and their published teaching. Gender is never inferred from names, voices or photos.
+- G2 Never fabricate theology. Every church claim carries a source tier and quote. D-tier is labeled as observed from sermons. Denominational priors are labeled "typical for <denomination>" and never stated as a congregation's practice.
+- G3 Social and political positions only when the church states them (tier A) or a cited outlet reports a public action (tier B). No party labels. Marriage rule per features.yaml (D11).
+- G4 No irreversible actions. Read-only public web: robots.txt respected, polite rate limits, no logins, no forms.
+- G5 No pastoral judgments. Concerns are cited news reports, stated neutrally.
 - G6 Sensitive denomination fields are applied only after human review.
 
 ## 6. Milestones
-- M0 (by 4:30 pm CT): end-to-end Stage 0 → Stage 1 list in the browser.
-- M1 (by 8:00 pm CT): Stage 2 cards + Stage 3 agent producing a Church Report for one church.
-- M2 (by 9:30 pm CT): preliminary submission (code, license, 250-word description).
-- M3 (overnight → 9:00 am MT Thu): polish, eval numbers, video backup, Agent Build Doc complete, MCP endpoint.
+- M0 (4:30 pm CT) Stage 0 → Stage 1 in the browser: **met**.
+- M1 (8:00 pm CT) Stage 2 + Stage 3 report: **met** in the rebuild. Live H6 smoke test still open in tasks.json.
+- M2b (8:30 pm CT) integration of the v2 rebuild: **met** (W7 integration verified).
+- M2 (10:00 pm CT) preliminary submission: team action, tracked as W7.
+- M3 (9:00 am MT Thu) finalist submission: Agent Build Doc complete, eval numbers, video backup.
 
 ## 7. Decision log (append-only; supersessions explicit)
 
@@ -102,22 +108,49 @@ An interactive church finder that **does not maintain a database of churches**. 
 | D10 | No fixed demo city; live demo, with a pre-started deep dive and a recorded backup. |
 | D11 | Marriage rule: a marriage definition is the church's position on same-sex marriage; it does not settle LGBTQ membership/leadership. |
 | D12 | Roles: Katie theology; Carter shared doc + Stage 3 sources; Wade Stage 3 sources; Daniel integration + Stage 1. |
-| D13 | App name: ChurchFocus. |
-| D14 | Stage 0 asks the LGBTQ question by default (neutral options). |
-| D15 | `contracts/features.yaml` (features.v2) is the single shared vocabulary. Source tiers A/B/C/D + prior. |
-| D16 | Stack: Python 3.11+, FastAPI, Jinja2 + HTMX, SQLite. (Dev default; veto-able.) |
-| D17 | Models: cloud (OpenAI) on stage; local models used for batch work (denom-kb, lexicon) and shown in logs. Model names live in `.env`. (Dev default.) |
-| D18 | Sermons: podcast RSS + transcription first; YouTube captions a labelled extra; SermonAudio API if a key is available. (Dev default.) |
-| D19 | christianese-lexicon not wired into tonight's build; shown as a reusable component; Stage 0 maps jargon with the model + features list. (Dev default.) |
-| D20 | Matching is deterministic and explainable; models only extract evidence and phrase questions. (Dev default.) |
-| D21 | Red-team fixes (features.v3): women ladder records minimum and/or maximum; ladder splits pastors vs elders; marriage and LGBTQ membership/leadership asked as two parallel questions; `community.young_adults` added; deep-search self-correction (quote re-check) made explicit. |
-| D22 | Sermon cap = 25 per church (supersedes the open limit in D9). Deep-search budgets raised to 120 min / 150 tool calls to fit it. |
-| D23 | Denomination KB accuracy 77% (audit round 3, n=30) accepted for the demo; impact bounded by prior-only use + sensitive-field human gate; improvement plan in eval/denomkb_audit.md (tracked as Q1). |
+| D13 | App name: ChurchFocus (briefly "Church Search"; ChurchFocus everywhere since C1). |
+| D14 | ~~Stage 0 asks the LGBTQ question by default.~~ Superseded by D33. |
+| D15 | `contracts/features.yaml` (features.v3) is the single shared vocabulary. Source tiers A/B/C/D + prior. |
+| D16 | Stack: Python 3.11+, FastAPI, Jinja2, SQLite. v1 pages use HTMX; the v2 chat is plain JavaScript. |
+| D17 | Models: cloud (OpenAI) on stage; local models for batch work (denom-kb, lexicon). Model names live in `.env`. |
+| D18 | Sermons: podcast RSS + transcription; YouTube captions (made first-class in C3); SermonAudio if a key is available. |
+| D19 | ~~christianese-lexicon not wired in tonight.~~ Superseded by D34. |
+| D20 | Matching is deterministic and explainable; models only extract evidence and phrase text. |
+| D21 | Red-team fixes (features.v3): women ladder min/max; pastors vs elders; marriage and LGBTQ membership/leadership separate; `community.young_adults`; deep-search quote self-check. |
+| D22 | Sermon cap = 25 per church. Deep budgets 120 min / 150 tool calls. |
+| D23 | Denomination KB accuracy 77% (audit round 3, n=30) accepted for the demo; bounded by prior-only use + sensitive-field gate; improvement plan in eval/denomkb_audit.md (Q1). |
+| D24 | Open-ended interview: starting place, then "what matters to you" in their own words; follow-ups only when needed; search offered right away. |
+| D25 | The search leads into a conversation: background website research with progress, factual Q&A from what was read, Open questions panel, deep dive targets those questions, report has "Your questions". |
+| D26 | Deep-dive fix: `reasoning_effort="none"` on tool calls (U15), configurable as `TOOLS_REASONING_EFFORT`. |
+| D27 | Formulaic back end, natural conversation: memory is an append-only machine-readable change log; the bot never asks want/avoid/don't-care. |
+| D28 | No elimination for practice/belief preferences — they move fit only. Hard filtering only at the denomination/tradition/branch level. |
+| D29 | Remove all non-Nicene groups from the app entirely. |
+| D30–D31 | Fit labels Strong · Possible · Not enough info yet · Unlikely · Poor; sort by fit then distance; dynamic table, 10 per page. |
+| D32 | "About you" panel shows the current profile in plain words; every item editable; edits logged. |
+| D33 | Never raise belief topics the person hasn't mentioned (supersedes D14). They are still researched and shown. |
+| D34 | Use the christianese lexicon (mapped to features.v3, filtered, plus a hand glossary) as interview hints; log the reason for every inference (supersedes D19). |
+| D35 | Denomination is the main identity filter but the bot never prompts for it; it answers denomination questions from the KB. |
+| D36 | Read-back = short summary in the bot's voice; no confirmation step before searching. |
+| D37 | Origin from free text (landmarks OK); travel time → straight-line miles (~45 min ≈ 30 mi), logged. |
+| D38 | Gather churches out to 50 mi; radius filter defaults to 15 mi or the person's limit. |
+| D39 | Discovery starts automatically in the background once a place is known (announcements narrowed by D45). |
+| D40 | Extra Places queries only when the radius grows beyond what is covered; coverage ledger per origin. |
+| D41 | Standard AI-chat interface; right-side tabs on desktop, tabs above the chat on phones. |
+| D42 | ~~Automatically run website research on the top 5.~~ Superseded by D46. Cancellation of unpicked work remains. |
+| D43 | Save every research result: website 90 days, deep 1 year. Reuse windows refined by D47. |
+| D44 | Fix everything we can tonight; MVP level. |
+| D45 | (U41) No unsolicited completion announcements; discovery updates the Churches tab silently. Medium results appear on the church row. A finished deep dive posts one message with its report link. |
+| D46 | (U42, REPAIR_PLAN) Website research only after explicit authorization: Learn more → Research selected (1–5) or a pin. Learn more may prepare the top five invisibly. Unpin cancels. |
+| D47 | (REPAIR_PLAN) Freshness: website facts reused < 7 days; deep dives reuse saved sources and re-check site pages > 30 days; source dates never advance via cache copies. Retention 90/365 days. |
+| D48 | (U44/U47) Research scope is broad and factual, not limited to preferences: medium covers services, full public staff, ministries and beliefs; deep covers seven minimum areas with nine adaptive tactics; preferences and questions prioritize only. |
+| D49 | (U45/U46) Truthful actions: create the job before acknowledging it; resolve church names uniquely or ask; persistent visible deep-dive status with real counts; no invented percentages. |
+| D50 | Session generations: every reset/new place increments a generation; stale discovery and jobs cannot publish. "Start over" offers new chat vs change this search. |
+| D51 | (C3/C4) YouTube sermons are first-class: captions first; recover broken channel hints with identity verification; save transcripts for future Q&A. |
+| D52 | (C5–C7) Memory semantics: want and avoid are independent; assertions add, revisions replace; broad families map to tradition; ordinary priorities are "important", dealbreaker only for explicit mandatory language; explicit Protestant scope persists. |
+| D53 | (C8) Discovery stays bounded (1 or 7 circles) and publishes per circle; completeness is not promised where Places caps results. |
 
 ## 8. Open questions
-- Q1 Burden validation quote (HUMAN, Daniel).
-- ~~Q2 Sermon budget~~ — resolved by D22 (cap 25). Live demo uses a pre-started deep dive.
-- Q3 Hosting for "runnable without a developer": Render/Railway vs local `run.bat`. Default: local + recorded demo tonight; hosted tomorrow morning if time.
-
-## Evening rebuild supersessions
-Decisions D24–D44 in `docs/ISSUES.md` supersede earlier interview and matching decisions where they conflict; `docs/REDESIGN.md` defines the current contracts. In particular, D33 replaces D14 (belief topics are only discussed when raised by the user), D34 replaces D19 (mapped lexicon hints are integrated), D28 replaces practice-based hard exclusions (fit changes; explicit denomination exclusions remain), and D43 sets research retention to 90/365 days with reuse under 30 days. Search coverage expands on demand up to 50 miles.
+- Q1 Burden validation quote (HUMAN, Daniel; task H5).
+- ~~Q2 Sermon budget~~ resolved by D22.
+- Q3 Hosting for "runnable without a developer": currently local `run.bat` shared through Tailscale Funnel. Hosted deploy (Render/Railway with a persistent disk) only if time allows.
+- Q4 Live 25-sermon audio deep dive not yet run end to end (H6); offline tests cover the pipeline.

@@ -1,5 +1,11 @@
 # ChurchFocus — Redesign v2 (MVP, 2026-10-07 evening)
 
+> **Historical record.** This was the contract for the evening rebuild (W0–W7), and it is implemented. Later changes supersede parts of it:
+> - `docs/REPAIR_PLAN.md`: website research only after Learn more or a pin (not automatic for the top 5); freshness 7/30 days; broad research scope.
+> - C1–C8 (see `docs/SESSION_LOG.md`).
+>
+> The current contracts are `docs/INTERFACES.md` and `docs/ARCHITECTURE.md`.
+
 Source of truth for the evening rebuild. Decisions D24–D44 and issues U1–U40 are in `docs/ISSUES.md`; tasks are W0–W6 in `tasks.json`.
 Rule: **file ownership is strict** (one owner per file) so parallel work merges cleanly. Contracts below are binding; change them here first.
 

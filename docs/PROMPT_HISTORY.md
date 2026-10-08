@@ -3,6 +3,22 @@
 Every prompt change: new file `app/prompts/<name>.v(N+1).md`, and an entry here with the old version, what was wrong (with evidence: a log line, a failing case), and what changed. The Agent Build Doc quotes from this file.
 denom-kb prompt history (match.v1→v2, extract.v1→v2, verify.v1→v2) is in `denom-kb/PROMPT_HISTORY.md`.
 
+## Active prompts (October 7, late evening)
+| Prompt | Active version | Loaded by | Earlier versions |
+|---|---|---|---|
+| interview_skill | **v8** | `app/stage0/conversation.py` | v1–v7 (archived) |
+| crisis_check | **v2** | conversation.py, stage0/interviewer.py | v1 |
+| medium_extract | **v1** | `app/stage2/summary.py` | replaced page_extract.v1/v2 for website research |
+| deep_search | **v5** | `app/stage3/agent.py` | v1–v4 |
+| sermon_analyse | **v3** | `app/stage3/sermons.py` | v1, v2 |
+| denom_classify | v1 | `app/stage1/denomination.py` | — |
+| report | v1 | `app/stage3/report.py` | — |
+| prior_map | v1 | `app/denom/kb.py` | — |
+| interviewer, readback | v1 | `/v1` flow only | superseded by interview_skill |
+| denom_answer, memory_edit, church_qa | inline | conversation.py, qa.py | unversioned system strings; any change still gets an entry here |
+
+Entries below are in the order the changes were made.
+
 ## v1 set (2026-10-07)
 deep_search.v1, interviewer.v1, readback.v1, denom_classify.v1, page_extract.v1, sermon_analyse.v1, report.v1, crisis_check.v1, prior_map.v1 — initial versions. interviewer.v1 and deep_search.v1 were revised before first use after a persona red-team (D21): ladder min/max, two LGBTQ questions, explicit quote self-check.
 

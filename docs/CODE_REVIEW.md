@@ -1,5 +1,7 @@
 # Code review — Cursor build (2026-10-07, ~3 pm CT)
 
+> **Status:** all findings R1–R12 are fixed, each with a regression test (tasks R1–R12 done). Kept as the review record. Later live issues are in `docs/ISSUES.md`.
+
 Scope: everything under `app/` and `app/templates/` after T0–T8 (120 tests green offline). Method: two independent reviewers read the code against PRD/ARCHITECTURE/INTERFACES and ran offline simulations; top findings spot-checked by hand.
 **Headline:** the offline build is solid (containment rules hold, no secrets logged, tool schema/ctx hiding correct, quote re-check works). But it has never touched a real API, and several paths only work with fakes. Fix the P0 items, then run one live smoke test before anything else.
 

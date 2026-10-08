@@ -1,5 +1,11 @@
 # Issues log (live testing, 2026-10-07)
 
+> **Status (late evening):**
+> - U1–U40 were addressed by the evening rebuild (W0–W7) and U41–U47 by the repair (X0–X5). See the summary at the end of this file.
+> - Decisions D24–D44 are copied into `docs/PRD.md` §7, which also records the later decisions D45–D53.
+> - New live issues get a new U-number here and a new task in `tasks.json`.
+> - The team's second findings document (`Second Hackathon Project Fix.docx`, not in git) has not been catalogued here yet.
+
 Running list from H6 / team testing. Not fixed yet unless marked. Add: ID · where · what you saw · session id.
 
 ## Conversation / UI (chat feel)

@@ -72,3 +72,14 @@ Restarted after verifying no pending/running research. Head-pastor negation guar
 
 ## C8 — Restore fast discovery
 Removed recursive saturated-circle expansion (up to147 calls); original one/seven circles restored, with per-circle publishing and generation checks. User authorized immediate restart despite ongoing deep research. Server restarted, live discovery session62cc9cb0d36c4f0fbdfc5f1945c1d795 completed with51 listed churches; Madison Our Saviour remains visible on first page. Full suite251 passed in77.31s.
+
+## Docs refresh — Oct 7, 10:45 pm CT (Claude, task D1)
+Brought every repo doc in line with the code at commit 874aab0 (after X0–X5 and C1–C8). Verified by reading the code and running the suite: 251 passed offline.
+- **README:** what the app does now; Windows/macOS/Linux setup; configuration including `TOOLS_REASONING_EFFORT`; how to use each tab; guardrails; layout; docs map; known limits.
+- **ARCHITECTURE, INTERFACES:** rewritten for the current modules, routes, tables, job lifecycle, coverage areas and active prompts. INTERFACES gets a contract-history section in place of the appended deltas.
+- **PRD:** current requirements; decisions D24–D44 copied in from ISSUES; D45–D53 added for the repair and the C fixes.
+- **CONVENTIONS, AGENTS.md, .cursor rules:** current containment rules, tasks.py commands (register, annotate), and live-server restart etiquette.
+- **AGENT_BUILD_DOC, SUBMISSION (243 words), EVAL_PLAN:** current architecture, prompt evolution, tools, verification evidence and the remaining human items.
+- **PROMPT_HISTORY:** active-prompt table at the top.
+- **REDESIGN, BUILD_PLAN, CODE_REVIEW, ISSUES:** marked as historical records with pointers to what superseded them.
+No code changed.

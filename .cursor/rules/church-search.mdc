@@ -1,12 +1,13 @@
 ---
-description: Church Search project rules (always on)
+description: ChurchFocus project rules (always on)
 alwaysApply: true
 ---
 Before writing code in this repo:
-1. Follow docs/CONVENTIONS.md (rules + definition of done).
-2. Use only names from docs/INTERFACES.md and feature ids from contracts/features.yaml.
-3. Do only the task you were given from docs/BUILD_PLAN.md and touch only its listed files.
+1. Read AGENTS.md, then follow docs/CONVENTIONS.md (rules + definition of done).
+2. Use only names from docs/INTERFACES.md and feature ids from contracts/features.yaml. Add any new name to INTERFACES.md in the same change.
+3. Research lifecycle, timing and scope rules are in docs/REPAIR_PLAN.md. They supersede docs/REDESIGN.md.
 4. Guardrails in docs/PRD.md section 5 are non-negotiable.
-5. Already built and tested (do not regenerate): app/config.py, app/models.py, app/features.py, app/match.py, app/denom/*, tests/conftest.py, tests/test_kb.py, tests/test_match.py, tests/test_features.py, tests/fixtures/kb_small.json.
-6. Run `python -m pytest -q` before saying a task is done. If blocked, reply "blocked: <reason>".
-7. Track state in tasks.json ONLY via `python scripts/tasks.py set <ID> in_progress|done|blocked "<note>"` (never hand-edit it).
+5. Never edit a released prompt. Add app/prompts/<name>.vN+1.md and record it in docs/PROMPT_HISTORY.md.
+6. Run `python -m pytest -q` (offline, 251+ tests) before saying a task is done. If blocked, reply "blocked: <reason>".
+7. Track state in tasks.json ONLY via `python scripts/tasks.py` (set / register / annotate). Never hand-edit it.
+8. Check for running research jobs before restarting the live server on port 8000.

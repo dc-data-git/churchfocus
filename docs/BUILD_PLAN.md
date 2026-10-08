@@ -1,5 +1,7 @@
 # ChurchFocus — BUILD_PLAN (Cursor handoff)
 
+> **Historical record.** This is the afternoon build plan (T0–T8, Oct 7). It is complete. The evening rebuild (W0–W7, `docs/REDESIGN.md`), the repair (X0–X5, `docs/REPAIR_PLAN.md`) and the fixes C1–C8 came after it. Use `tasks.json` (`python scripts/tasks.py`) for live status, and `docs/ARCHITECTURE.md` / `docs/INTERFACES.md` for how the app works now. Still-open human tasks from this plan: H1 (sensitive-field review), H3 (eval set), H5 (burden quote), H6 (live smoke test), T8.3 (persona role-play).
+
 Clock: start ~12:45 pm CT. **Preliminary submission 10:00 pm CT** (code + 250-word description). Finalist submission 9:00 am MT Thu.
 Each person drives their own Cursor session on **their own files only** (avoids merge conflicts). Owner changes vs. the text below (tasks.json wins): T1.2 OSM → Wade; T6.2 results page → Katie; T7.3 report → Carter; new T7.4 deep-search routes → Daniel. Every Cursor prompt starts with:
 
