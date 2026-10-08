@@ -1,10 +1,12 @@
 # Issues log (live testing, 2026-10-07)
 
-> **Status (late evening):**
-> - U1–U40 were addressed by the evening rebuild (W0–W7) and U41–U47 by the repair (X0–X5). See the summary at the end of this file.
-> - Decisions D24–D44 are copied into `docs/PRD.md` §7, which also records the later decisions D45–D53.
-> - New live issues get a new U-number here and a new task in `tasks.json`.
-> - The team's second findings document (`Second Hackathon Project Fix.docx`, not in git) has not been catalogued here yet.
+> **Current status — October 7:**
+> - Historical U1–U47 findings and repair notes remain below. Their original “not fixed” descriptions are historical; the later verification sections supersede them.
+> - Current open items: U48, U50–U56. U49 and U57–U61 are fixed with the qualifications recorded below.
+> - C2–C8 and the completed Our Saviour's live deep dive provide the latest verification. 251 regression tests passed after C8.
+> - This update consolidates feedback from this conversation; it is not a fresh comprehensive audit of either Word feedback document.
+> - Documentation only: no application changes, research jobs, or restart authorized by this update.
+
 
 Running list from H6 / team testing. Not fixed yet unless marked. Add: ID · where · what you saw · session id.
 
@@ -103,7 +105,7 @@ Running list from H6 / team testing. Not fixed yet unless marked. Add: ID · whe
 ## Ops
 - O1 · tests → data/logs · Test runs wrote into the real `data/logs/calls.jsonl` (415 failed `web_search` + 46 `denom_classify` with empty model, 1:29–2:19 pm CT). Tests should use a temp DATA_DIR; clear these rows before computing cost metrics.
 
-## Post-rebuild user testing — October 7 (open; not fixed)
+## Post-rebuild user testing — October 7 (historical findings; see repair status below)
 - U41 · Background search / chat notifications · Background searches announce completion before the user has asked for their results. Hold completion announcements until the user requests or explicitly starts the relevant search; do not interrupt the interview with unsolicited completion reports.
 - U42 · Medium research starts too early · Website (medium / Stage 2) research starts before the user officially starts the search. Hold medium research until the user explicitly starts the search. Knowing a location or completing a speculative background lookup is not sufficient to launch it. This user correction supersedes D42 where it permits premature automatic medium research; U41 also narrows D39's automatic announcements.
 - U43 · Hesston search / reset lifecycle · User saw no churches for both "Hesston" and "Hesston, Kansas", plus completion messages arriving after "Start over again". Read-only inspection confirms both were geocoded to the same correct Kansas coordinates (38.1383437, -97.4314267); missing state was not the cause. Investigate overlapping location changes/reset and background search ownership: workers can hold an old candidate dictionary while reset replaces it, then count against the new empty dictionary. Also prevent abandoned searches from posting completion results into the current conversation. Root cause still to be reproduced; not fixed.
@@ -120,3 +122,30 @@ U44: corrected broad practical scans/full staff/persistent sources and hero extr
 U45/U46: persistent real deep progress/counts/elapsed and terminal links; unique aliases across candidates, job creation before acknowledgement, explicit ambiguity/error. Actual browser/API and model tool-schema checks passed.
 U47: broad medium baseline and deep no-preference scope, seven minimum thematic areas/nine adaptive tactics, persisted sermon corpus, source chunk inspection, future Q&A, honest partial gaps. Offline coverage/corpus regressions pass; long live audio job not exercised.
 Final status and limitations: REPAIR_VERIFICATION.md and tasks X0–X5. D42/D43 timing and refresh superseded by REPAIR_PLAN.md. No visual redesign.
+
+
+## Subsequent user testing — current issue register
+
+| ID | Status | Reported issue and remaining work |
+|---|---|---|
+| U48 | Open | **Broad discovery misses churches.** Our Saviour's Lutheran Church, 1201 Droster Rd, was absent from the newest broad east-Madison chat (697bb27b510a410ca35895ac05c1473b; 170 candidates; seven queries; 15-mile radius), despite being 3.19 miles away. A direct backend search centered on 1122 Bonnie Lane found it 0.96 miles away, 14th by distance among 60 results. Manual restoration in an earlier chat does not fix future chats. Need bounded recovery of omissions without restoring the recursive slowdown in U61. Google ranked results are not exhaustive directory coverage. |
+| U49 | Fixed for reported failure | **Vineyard medium scan failed on readable website content.** C2 recovers published Servant Keeper content/menu JSON, flags inadequate shells as read failures, and invalidates failed old summaries. Live backend verified service times, ministries and public staff. Broader medium quality remains U56; this is not a guarantee of completeness on all sites. |
+| U50 | Open | **Deep-dive duration warning.** Add the requested expectation that a deep dive could take 15 minutes to an hour, without presenting that as a measured estimate. Progress/counts/elapsed already exist. Retain timings to calibrate later: Our Saviour's medium took about 2m8s; deep took 9m. |
+| U51 | Open | **Premature “Not enough info yet” badge.** User dislikes the unknown-fit badge popping up before sufficient research. It remains in app.js. Decide appropriate suppression/wording and distinguish unresearched from researched-but-uncertain. |
+| U52 | Open; diagnosis incomplete | **All Souls Anglican missing in Wheaton.** User supplied http://www.allsouls.com/ and 25W741 Jewell Rd, Wheaton, IL 60187. No verified resolution recorded. Inspect discovery, origin/radius, affiliation and exclusions before assigning a cause. |
+| U53 | Open | **Internal field names leak into cards.** Screenshot shows worship_service_time, worship service, active_ministry, and similar programming terminology. Render readable labels and compact factual summaries without changing the established appearance. |
+| U54 | Open | **Misleading “Still unknown” report lists.** User reported a long generic list including distance and service times. Reconcile known logistics, medium facts, deep evidence and requested questions before listing gaps; distinguish not researched, unreadable and genuinely unanswered. Do not imply every possible feature was investigated. |
+| U55 | Open decision | **Deep-dive breadth versus excessive sermon collection/runtime.** Existing limits remain 25 sermons, 120 minutes and 150 tool calls; they were not removed. User questioned excessive collection and stopped a Vineyard run. Need agreed adaptive sufficiency/stopping policy that retains substantive sermon RAG, varied teaching samples and the minimum coverage checklist. No cap change made. |
+| U56 | Awaiting acceptance verification | **Medium completeness beyond the website-reader fix.** Broad factual scope, staff/roles and essential service/ministry extraction are implemented (U44/C2). User still needs reliable coverage across difficult sites. Our Saviour's medium finished in about 2m8s, but its open-feature list and page choices warrant reconciliation with the more complete deep results. This is a quality review, not proof that every reported medium failure remains unfixed. |
+| U57 | Fixed; live verified | **YouTube sermons and transcripts were missed.** C3 added discovery/captions/analysis; C4 requires recovery from incomplete or broken hints. Vineyard retrieved eight caption texts and analysed five before user cancellation. Our Saviour's completed live run recovered its malformed channel link and transcribed/analysed nine recordings across three batches. Sermon metadata remains partial where dates/speakers cannot be established; this limitation must remain honest. |
+| U58 | Fixed; regression/live checks | **Madison preference memory/ranking and repeated questions.** C5 preserves hymns separately from liturgy, broad Lutheran/Anglican families, wanted plus avoided values, helping-other context and broad biblical authority. Ordinary priorities no longer become invented identity dealbreakers, Catholic avoidance no longer boosts unrelated churches, and known important worship conflicts lower fit. ELS family fallback added without inventing doctrine/practice. |
+| U59 | Fixed; active memory corrected | **Head-pastor preference reversed.** “Preachers ok. But not head pastors or priests” was stored as avoid:no, reversing the meaning. C6 retracted the inverted value, asserted want:no, and added a normalization guard plus prompt guidance. Other acceptable roles remain separate. Regression test verifies preferred ranking direction. |
+| U60 | Fixed for explicit wording; live verified | **“Definitely Protestant” acknowledged but not saved.** C7 saves explicit scope independently of model-generated operations, includes all Protestant branches and excludes Catholic/Eastern/Oriental Orthodox. Live results were checked after correction. General preference interpretation still needs ongoing acceptance testing. |
+| U61 | Fixed; live verified | **Discovery became extremely slow after recursive refinement.** C7 could expand seven searches to as many as147 and withheld results until completion. C8 removed recursive expansion, restored one/seven circles, and publishes each completed circle immediately. Waiting Bonnie Lane discovery completed with51 listed churches. U48 remains open: faster discovery does not guarantee exhaustive coverage. |
+
+### Verification and follow-up boundaries
+
+- Our Saviour's deep job bfe3a8b79c42440ea57d3e80c93cd765 completed in9 minutes; report and source corpus are saved locally. It established ELS/CELC affiliation, worship/service details and nine analysed sermon transcripts. Current staff coverage and recording metadata were explicitly partial.
+- The app server was stopped at the user's request after these tests. Updating this register does not restart it or launch research.
+- The user requested small substantive changes and preservation of the existing look and feel. These entries record work to scope later; they do not authorize implementation of the remaining issues.
+- Related observations requiring separate diagnosis, rather than confirmed user-reported open defects: stale card affiliation may disagree with the deep report (Our Saviour's initial ELCA/WELS guesses versus sourced ELS); medium scans spent substantial budget on photo-gallery pages. Keep these visible when reviewing U56.
